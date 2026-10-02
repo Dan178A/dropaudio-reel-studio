@@ -13,7 +13,7 @@ Instalar (una vez):  pip install faster-whisper pillow pillow-heif numpy
                      pip install -e C:\\Users\\DAN_PC\\Documents\\GitHub\\pyCapCut
 Ejecutar:            python reel_studio.py
 """
-import json, os, sys, queue, re, subprocess, threading, time, urllib.request, base64, tempfile
+import json, os, sys, queue, re, subprocess, threading, time, urllib.request, urllib.error, base64, tempfile
 
 OLLAMA = os.environ.get("OLLAMA_HOST", "http://localhost:11434")
 AQUI = os.path.dirname(sys.executable) if getattr(sys, "frozen", False) else os.path.dirname(os.path.abspath(__file__))
@@ -97,11 +97,42 @@ def decidir(desc, habla, modelo):
             "interes": round(a["interes"]["score"] / 2, 3)}  # score viene en índice 0..2
 
 
-def escribir_guion(material, modelo):
-    r = ollama("/api/chat", {"model": modelo, "stream": False, "format": "json",
-                             "messages": [{"role": "system", "content": GUION},
-                                          {"role": "user", "content": material}]}, timeout=900)
-    txt = r["message"]["content"]
+def escribir_guion(material, modelo, log=lambda *a: None, limite=600):
+    """Pide el guion en streaming: se ve el avance (pensando / escribiendo) y nunca se queda colgado sin aviso.
+    Desactiva el «razonamiento» largo de los modelos que piensan (think: false) si el modelo lo admite."""
+    body = {"model": modelo, "stream": True, "format": "json", "think": False, "options": {"num_ctx": 16384},
+            "messages": [{"role": "system", "content": GUION}, {"role": "user", "content": material}]}
+    inicio, ultimo, txt, pensado = time.time(), 0, [], 0
+    for intento in (1, 2):
+        try:
+            req = urllib.request.Request(OLLAMA + "/api/chat", json.dumps(body).encode(), {"Content-Type": "application/json"})
+            with urllib.request.urlopen(req, timeout=180) as r:  # 180 s sin recibir nada = colgado
+                for linea in r:
+                    if not linea.strip():
+                        continue
+                    trozo = json.loads(linea)
+                    if trozo.get("error"):
+                        raise RuntimeError(trozo["error"])
+                    msg = trozo.get("message", {})
+                    pensado += len(msg.get("thinking") or "")
+                    txt.append(msg.get("content") or "")
+                    ahora = time.time()
+                    if ahora - inicio > limite:
+                        raise TimeoutError(f"{modelo} tardó más de {limite // 60} min")
+                    if ahora - ultimo > 1:
+                        ultimo, n = ahora, sum(map(len, txt))
+                        seg = int(ahora - inicio)
+                        log("estado", f"{modelo} escribiendo el guion… {n} caracteres · {seg} s" if n else
+                                      f"{modelo} pensando… {pensado} caracteres · {seg} s")
+                    if trozo.get("done"):
+                        break
+            break
+        except urllib.error.HTTPError as e:
+            detalle = e.read().decode(errors="ignore")
+            if intento == 1 and "think" in detalle.lower():  # el modelo no acepta think:false → sin esa opción
+                body.pop("think"); txt.clear(); continue
+            raise RuntimeError(f"Ollama respondió {e.code}: {detalle[:200]}")
+    txt = "".join(txt)
     txt = txt[txt.find("{"): txt.rfind("}") + 1]  # por si el modelo agrega texto alrededor
     return json.loads(txt)
 
@@ -268,16 +299,22 @@ def frange(a, b, s):
 
 
 # ---------------------------------------------------------------- 2. guion
-def material_para_llm(datos, minimo):
+def material_para_llm(datos, minimo, por_archivo=4, largo=170):
+    """Resumen compacto para el modelo de texto: las mejores tomas de cada archivo, descripciones cortas,
+    sin repetir tomas quietas, y lo que se dice. Menos texto = guion más rápido y más enfocado."""
     lineas = []
     for d in datos.values():
-        buenas = [t for t in d["tomas"] if t["usable"] >= minimo]
+        buenas = [t for t in d["tomas"] if t["usable"] >= minimo and not t.get("repetida")]
         if not buenas:
             continue
+        buenas = sorted(sorted(buenas, key=lambda t: t["usable"] * t["interes"], reverse=True)[:por_archivo],
+                        key=lambda t: t["inicio"])
         lineas.append(f"\n## {d['archivo']} ({'foto' if d['foto'] else 'video'}, {d['dur']} s)")
         for t in buenas:
-            lineas.append(f"- {t['inicio']}-{t['inicio'] + t['dur']:.1f}s {t['tipo']} usable={t['usable']} "
-                          f"interes={t['interes']}: {t['descripcion']}")
+            desc = " ".join(t["descripcion"].split())
+            desc = desc if len(desc) <= largo else desc[:largo].rsplit(" ", 1)[0] + "…"
+            lineas.append(f"- {t['inicio']}-{t['inicio'] + t['dur']:.1f}s {t['tipo']} u={t['usable']:.2f} "
+                          f"i={t['interes']:.2f}: {desc}")
         for h in d["habla"]:
             lineas.append(f"  habla {h['ini']}-{h['fin']}s: \"{h['texto']}\"")
     return "Material disponible:" + "\n".join(lineas)
@@ -336,8 +373,12 @@ def hacer_guion(carpeta, cfg, log):
     if cfg["escritor"] == "(reglas, sin IA)":
         sel = guion_por_reglas(datos, cfg["minimo"])
     else:
-        log("estado", f"{cfg['escritor']} está escribiendo el guion…")
-        sel = escribir_guion(material_para_llm(datos, cfg["minimo"]), cfg["escritor"])
+        log("estado", f"Enviando las tomas a {cfg['escritor']}…")
+        try:
+            sel = escribir_guion(material_para_llm(datos, cfg["minimo"]), cfg["escritor"], log)
+        except Exception as e:  # nunca dejar el paso colgado: si el modelo falla, guion por reglas
+            log("error", f"{cfg['escritor']} no pudo escribir el guion ({e}). Uso el guion por reglas; puedes editarlo.")
+            sel = guion_por_reglas(datos, cfg["minimo"])
     sel = validar(sel, datos)
     json.dump(sel, open(os.path.join(carpeta, "seleccion.json"), "w", encoding="utf-8"), ensure_ascii=False, indent=1)
     return sel
