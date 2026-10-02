@@ -166,6 +166,15 @@ summary::after{content:"＋";color:var(--gold)}details[open] summary::after{cont
 .toast.show{transform:none}.toast.err{border-color:var(--red)}
 .toast p{margin:0;font-size:14px}
 .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+.fmts{display:flex;flex-wrap:wrap;gap:6px}
+.fmts .chip{min-height:30px;padding:4px 11px;font-size:12px}
+.reels{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:14px}
+.reels .chip{display:inline-flex;gap:6px;align-items:center}
+.reels .chip small{font-weight:500;opacity:.8}
+.reelbar{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;margin-bottom:16px;padding:14px;border:1px solid var(--line);border-radius:var(--r);background:var(--card)}
+.reelbar .field{margin:0;min-width:240px;flex:1}
+.avisos{border:1px solid var(--gold3);border-radius:var(--r2);padding:10px 14px;margin-bottom:14px;color:var(--gold2);font-size:13px}
+.avisos div+div{margin-top:4px}
 </style>
 </head>
 <body>
@@ -210,7 +219,7 @@ summary::after{content:"＋";color:var(--gold)}details[open] summary::after{cont
     <div class="field"><label for="sJev"><svg width="16" height="16" style="color:var(--gold)"><use href="#i-scale"/></svg>Decisión (Jev)</label>
       <select id="sJev" data-k="jev"></select><div class="help">Decide si sirve, qué es y cuánto engancha</div></div>
     <div class="field"><label for="sEsc"><svg width="16" height="16" style="color:var(--gold)"><use href="#i-pen"/></svg>Guion</label>
-      <select id="sEsc" data-k="escritor"></select><div class="help">Arma el reel con los 5 pasos de «Así compras»</div></div>
+      <select id="sEsc" data-k="escritor"></select><div class="help">Escribe un guion por reel, según su formato</div></div>
     <div class="field"><label for="sWh"><svg width="16" height="16" style="color:var(--gold)"><use href="#i-mic"/></svg>Transcripción (Whisper)</label>
       <select id="sWh" data-k="whisper"><option>(ninguno)</option><option>tiny</option><option>base</option><option>small</option><option>medium</option></select>
       <div class="help">Para no cortar lo que dices. «small» = buen equilibrio</div></div>
@@ -224,6 +233,7 @@ summary::after{content:"＋";color:var(--gold)}details[open] summary::after{cont
       <div class="field"><label for="nMin">Mín. «usable»</label><input type="number" id="nMin" data-k="minimo" min="0" max="1" step="0.05"></div>
       <div class="field"><label for="nVc">Vol. clips</label><input type="number" id="nVc" data-k="vol_clips" min="0" max="1" step="0.1"></div>
       <div class="field"><label for="nVm">Vol. música</label><input type="number" id="nVm" data-k="vol_musica" min="0" max="1" step="0.05"></div>
+      <div class="field"><label for="nMax">Máx. reels por formato</label><input type="number" id="nMax" data-k="max_por_formato" min="1" max="6" step="1"></div>
       <div class="field"><label for="nSim">Análisis simultáneos</label><input type="number" id="nSim" data-k="simultaneos" min="1" max="16" step="1"></div>
     </div>
     <div class="help" style="margin:-4px 0 6px">Cuántos archivos y llamadas a Ollama van a la vez. Modelos <b>:cloud</b> aguantan 6–8; locales, lo que diga <code>OLLAMA_NUM_PARALLEL</code>.</div>
@@ -251,19 +261,20 @@ summary::after{content:"＋";color:var(--gold)}details[open] summary::after{cont
       <button class="btn gold" id="b1">Analizar carpeta</button>
     </article>
     <article class="step" id="st2" role="listitem">
-      <div class="head"><span class="num">2</span><h3>Escribir guion</h3></div>
-      <p class="what">Gancho, 5 pasos y narración, sin cortar tus frases.</p>
+      <div class="head"><span class="num">2</span><h3>Escribir guiones</h3></div>
+      <p class="what">Varios reels separados por formato, sin repetir tomas ni cortar tus frases.</p>
+      <div class="fmts" id="fmts" role="group" aria-label="Formatos de la serie"></div>
       <div class="meta" id="m2" aria-live="polite"></div>
       <div class="bar indet" id="p2" hidden><i></i></div>
-      <button class="btn gold" id="b2">Escribir guion</button>
+      <button class="btn gold" id="b2">Escribir guiones</button>
     </article>
     <article class="step" id="st3" role="listitem">
       <div class="head"><span class="num">3</span><h3>Crear en CapCut</h3></div>
-      <div class="field" style="margin:0"><label for="tNom" class="sr">Nombre del borrador</label>
-        <input type="text" id="tNom" data-k="nombre" placeholder="Nombre del borrador"></div>
+      <div class="field" style="margin:0"><label for="tNom" class="sr">Prefijo de los borradores</label>
+        <input type="text" id="tNom" data-k="nombre" placeholder="Prefijo de los borradores"></div>
       <div class="meta" id="m3" aria-live="polite"></div>
       <div class="bar indet" id="p3" hidden><i></i></div>
-      <button class="btn gold" id="b3">Crear borrador</button>
+      <button class="btn gold" id="b3">Crear borradores</button>
     </article>
   </div>
 
@@ -291,9 +302,18 @@ const $ = s => document.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const TIPOS = {producto_detalle:"Producto de cerca", unboxing:"Unboxing", prueba_sonido:"Prueba de sonido",
   entrega_moto:"Entrega en moto", pago:"Pago", persona:"Persona a cámara", otro:"Otro"};
-const PASOS = {gancho:["Gancho","#F4F1EB"], "1":["01 · Elige","#E2BE72"], "2":["02 · Escríbenos","#CDA860"],
-  "3":["03 · Vamos a ti","#B8924C"], "4":["04 · Lo pruebas","#D9B46A"], "5":["05 · Pagas","#A88140"], cta:["CTA","#F0EDE8"]};
-let S = {cfg:{}, analisis:null, guion:null, av:-1, gv:-1, job:{}, filtro:"buenas", tipo:"todos", wasRunning:false};
+const COLORES = {gancho:"#F4F1EB", "1":"#E2BE72", "2":"#CDA860", "3":"#B8924C", "4":"#D9B46A", "5":"#A88140", cta:"#F0EDE8"};
+let S = {cfg:{}, analisis:null, guion:null, av:-1, gv:-1, job:{}, filtro:"buenas", tipo:"todos", wasRunning:false,
+         fmts:null, orden:[], vi:0};
+// pasos del formato del reel activo: {clave: [etiqueta, color]}
+function pasosDe(formato){
+  const f = S.fmts?.[formato], out = {gancho:["Gancho", COLORES.gancho]};
+  for (const [k,t] of Object.entries(f?.pasos || {})) out[k] = [`0${k} · ${t}`, COLORES[k] || "#B8924C"];
+  out.cta = ["CTA", COLORES.cta];
+  return out;
+}
+let PASOS = pasosDe("asi_compras");
+const videos = () => S.guion?.videos || [];
 let saveT = null;
 
 async function api(path, body){
@@ -344,6 +364,18 @@ $("#bFolder").onclick = async () => {
   } else { toast("Elige la carpeta en la ventana de Windows…"); await api("/api/elegir_carpeta", {}); }
   S.av = S.gv = -1; poll();
 };
+function renderFmts(){
+  if (!S.fmts) return;
+  const on = S.cfg.formatos || S.orden;
+  const html = S.orden.map(k => `<button class="chip" data-fmt="${k}" aria-pressed="${on.includes(k)}" title="Usa tomas de: ${esc(S.fmts[k].nucleo.map(t=>TIPOS[t]).join(", "))}">${esc(S.fmts[k].titulo)}</button>`).join("");
+  if ($("#fmts").dataset.h !== html){ $("#fmts").innerHTML = html; $("#fmts").dataset.h = html; }
+}
+$("#fmts").onclick = e => {
+  const b = e.target.closest("[data-fmt]"); if (!b) return;
+  const on = new Set(S.cfg.formatos || S.orden), k = b.dataset.fmt;
+  if (on.has(k)){ if (on.size === 1){ toast("Deja al menos un formato."); return; } on.delete(k); } else on.add(k);
+  S.cfg.formatos = S.orden.filter(x => on.has(x)); api("/api/cfg", {formatos: S.cfg.formatos}); renderFmts();
+};
 $("#bModels").onclick = () => { delete $("#sVision").dataset.loaded; api("/api/tarea/modelos", {}); };
 
 /* ---------- pasos ---------- */
@@ -352,7 +384,7 @@ for (const [b, t] of [["#b1","analizar"],["#b2","guion"],["#b3","armar"]])
 
 function renderSteps(d){
   const j = d.job, run = j.corriendo && j.tarea !== "modelos";
-  const tieneA = !!(S.analisis && Object.keys(S.analisis).length), tieneG = !!(S.guion && S.guion.clips?.length);
+  const tieneA = !!(S.analisis && Object.keys(S.analisis).length), vs = videos().filter(v => v.clips?.length), tieneG = vs.length > 0;
   const st = {1: tieneA, 2: tieneG, 3: !!d.borrador};
   const activo = run ? {analizar:1, guion:2, armar:3}[j.tarea] : (!tieneA ? 1 : !tieneG ? 2 : 3);
   for (const i of [1,2,3]){
@@ -366,8 +398,8 @@ function renderSteps(d){
   $("#b2").disabled = run || !tieneA;
   $("#b3").disabled = run || !tieneG;
   $("#b1").textContent = tieneA ? "Analizar archivos nuevos" : "Analizar carpeta";
-  $("#b2").textContent = tieneG ? "Reescribir guion" : "Escribir guion";
-  $("#b3").textContent = d.borrador ? "Crear otra vez" : "Crear borrador";
+  $("#b2").textContent = tieneG ? "Reescribir guiones" : "Escribir guiones";
+  $("#b3").textContent = d.borrador ? "Crear otra vez" : vs.length > 1 ? `Crear ${vs.length} borradores` : "Crear borrador";
 
   const tomas = tieneA ? Object.values(S.analisis).reduce((n,x)=>n+x.tomas.length,0) : 0;
   const buenas = tieneA ? Object.values(S.analisis).reduce((n,x)=>n+x.tomas.filter(t=>t.usable>=S.cfg.minimo).length,0) : 0;
@@ -378,9 +410,10 @@ function renderSteps(d){
     $("#p1 i").style.width = pct + "%";
     $("#m1").innerHTML = `<b>${pct}%</b> · ${j.hecho}/${j.total} archivos${eta!==null?` · faltan ${eta<1?"menos de 1 min":"~"+eta+" min"}`:""}`;
   }
-  const dur = tieneG ? S.guion.clips.reduce((s,c)=>s+c.segundos,0) : 0;
-  $("#m2").innerHTML = run && activo===2 ? esc(j.mensaje) : tieneG ? `<svg width="14" height="14" style="color:var(--ok)"><use href="#i-check"/></svg>${S.guion.clips.length} clips · ${fmt(dur)}` : tieneA ? "Listo para escribir" : "Primero analiza";
-  $("#m3").innerHTML = run && activo===3 ? esc(j.mensaje) : d.borrador ? `<svg width="14" height="14" style="color:var(--ok)"><use href="#i-check"/></svg>Creado · ${fmt(d.borrador.dur)}` : tieneG ? "Se crea en tus borradores" : "Primero el guion";
+  const nclips = vs.reduce((n,v)=>n+v.clips.length,0);
+  $("#m2").innerHTML = run && activo===2 ? esc(j.mensaje) : tieneG ? `<svg width="14" height="14" style="color:var(--ok)"><use href="#i-check"/></svg>${vs.length} ${vs.length===1?"reel":"reels"} · ${nclips} clips` : tieneA ? "Listo para escribir" : "Primero analiza";
+  const nb = d.borrador?.nombres?.length || 1;
+  $("#m3").innerHTML = run && activo===3 ? esc(j.mensaje) : d.borrador ? `<svg width="14" height="14" style="color:var(--ok)"><use href="#i-check"/></svg>${nb} ${nb===1?"borrador creado":"borradores creados"}` : tieneG ? "Uno por reel, en tus borradores" : "Primero los guiones";
 
   // aviso al terminar
   if (S.wasRunning && !j.corriendo && j.tarea !== "modelos"){
@@ -394,8 +427,8 @@ function renderSteps(d){
   $("#doneBox").innerHTML = d.borrador && !run ? `
     <div class="done" role="status">
       <div class="big"><svg width="26" height="26" style="color:#120f0a"><use href="#i-check"/></svg></div>
-      <div><h4>Borrador «${esc(d.borrador.nombre)}» listo en CapCut</h4>
-      <ol><li>Abre CapCut (si estaba abierto, ciérralo y ábrelo) y entra al borrador.</li>
+      <div><h4>${(d.borrador.nombres||[d.borrador.nombre]).length > 1 ? "Borradores listos en CapCut" : "Borrador listo en CapCut"}: ${(d.borrador.nombres||[d.borrador.nombre]).map(n=>`«${esc(n)}»`).join(", ")}</h4>
+      <ol><li>Abre CapCut (si estaba abierto, ciérralo y ábrelo) y entra a cada borrador.</li>
       <li>Selecciona los textos de la pista <b>voz</b> (clic en el primero, Shift + clic en el último).</li>
       <li><b>Texto a voz → Nandez → Generar</b>. Luego, si quieres, borra los textos y deja el audio.</li></ol></div>
     </div>` : "";
@@ -458,7 +491,7 @@ function toUI(sel){
   return g;
 }
 function fromUI(g){
-  const out = {gancho:g.gancho, promesa:g.promesa, clips:[], narracion:[]};
+  const out = {formato:g.formato, titulo:g.titulo, nombre:g.nombre, gancho:g.gancho, promesa:g.promesa, clips:[], narracion:[]};
   g.clips.forEach((c,i) => { const {narr, ...rest} = c; out.clips.push(rest); narr.forEach(n => out.narracion.push({clip:i, en:+n.en, texto:n.texto})); });
   return out;
 }
@@ -467,13 +500,27 @@ function habla(file, desde, seg){
   const d = S.analisis?.[file]; if (!d) return "";
   return (d.habla||[]).filter(h => h.fin > desde && h.ini < desde + seg).map(h => h.texto).join(" ");
 }
+function cargarReel(i){
+  const vs = videos(); S.vi = Math.max(0, Math.min(i, vs.length - 1));
+  G = vs.length ? toUI(vs[S.vi]) : null; PASOS = pasosDe(G?.formato || "asi_compras");
+}
 function renderGuion(){
-  const p = $("#pan-g");
-  if (!G){ $("#nG").textContent = "—"; p.innerHTML = `<div class="empty"><b>Todavía no hay guion</b>Cuando termines el análisis, pulsa <b>Escribir guion</b>. Podrás editar todo aquí antes de crear el borrador.</div>`; return; }
+  const p = $("#pan-g"), vs = videos();
+  if (!G){ $("#nG").textContent = "—"; p.innerHTML = `<div class="empty"><b>Todavía no hay guiones</b>Cuando termines el análisis, elige los formatos en el paso 2 y pulsa <b>Escribir guiones</b>. Saldrá un reel por formato (o más, si hay material) y podrás editar cada uno aquí.</div>`; return; }
   const total = G.clips.reduce((s,c)=>s+(+c.segundos||0),0);
   const ok = total >= 28 && total <= 42;
-  $("#nG").textContent = G.clips.length;
+  $("#nG").textContent = vs.length;
+  const avisos = S.guion?.avisos || [];
   p.innerHTML = `
+    <div class="reels" role="tablist" aria-label="Reels de la serie">${vs.map((v,i)=>{
+      const dur = v.clips.reduce((s,c)=>s+(+c.segundos||0),0);
+      return `<button class="chip" role="tab" data-reel="${i}" aria-pressed="${i===S.vi}" aria-selected="${i===S.vi}">${esc(v.titulo || ("Reel " + (i+1)))} <small>${v.clips.length} clips · ${fmt(dur)}</small></button>`;}).join("")}</div>
+    ${avisos.length ? `<div class="avisos" role="note">${avisos.map(a=>`<div>${esc(a)}</div>`).join("")}</div>` : ""}
+    <div class="reelbar">
+      <div class="field"><label for="gN">Nombre del borrador en CapCut</label><input type="text" id="gN" value="${esc(G.nombre || "")}" maxlength="60"></div>
+      <span class="pill">${esc(S.fmts?.[G.formato]?.titulo || G.formato || "Así compras")}</span>
+      <button class="btn ghost sm" id="gDel"><svg width="14" height="14" style="color:var(--red)"><use href="#i-trash"/></svg>Quitar este reel</button>
+    </div>
     <div class="hook">
       <div>
         <div class="field"><label for="gG">Gancho (problema del cliente, se ve en el primer cuadro)</label><input type="text" id="gG" value="${esc(G.gancho)}" maxlength="60"></div>
@@ -514,7 +561,8 @@ function renderGuion(){
 }
 $("#pan-g").addEventListener("input", e => {
   const t = e.target;
-  if (t.id === "gG"){ G.gancho = t.value; $("#hookPrev").textContent = t.value; }
+  if (t.id === "gN"){ G.nombre = t.value; }
+  else if (t.id === "gG"){ G.gancho = t.value; $("#hookPrev").textContent = t.value; }
   else if (t.id === "gP") G.promesa = t.value;
   else if (t.dataset.c) G.clips[t.dataset.i][t.dataset.c] = t.dataset.c === "paso" ? t.value : parseFloat(t.value) || 0;
   else if (t.dataset.n) G.clips[t.dataset.i].narr[t.dataset.j][t.dataset.n] = t.dataset.n === "en" ? parseFloat(t.value) || 0 : t.value;
@@ -523,6 +571,12 @@ $("#pan-g").addEventListener("input", e => {
 });
 $("#pan-g").addEventListener("change", e => { if (e.target.dataset.c) { guardar(true); } });
 $("#pan-g").addEventListener("click", e => {
+  const r = e.target.closest("[data-reel]");
+  if (r){ if (G) guardar(true); cargarReel(+r.dataset.reel); renderGuion(); return; }
+  if (e.target.closest("#gDel")){
+    if (!confirm(`¿Quitar «${G.titulo}» de la serie?`)) return;
+    S.guion.videos.splice(S.vi, 1); cargarReel(S.vi); renderGuion(); guardar(true, true); return;
+  }
   const b = e.target.closest("[data-mv],[data-rm],[data-add-n],[data-del-n],[data-go]"); if (!b) return;
   if (b.dataset.go){ const el = $("#clip"+b.dataset.go); el.scrollIntoView({behavior:"smooth", block:"center"}); el.classList.add("flash"); setTimeout(()=>el.classList.remove("flash"), 900); return; }
   if (b.dataset.mv){ const [i,d] = b.dataset.mv.split(":").map(Number); [G.clips[i], G.clips[i+d]] = [G.clips[i+d], G.clips[i]]; }
@@ -531,13 +585,16 @@ $("#pan-g").addEventListener("click", e => {
   if (b.dataset.delN){ const [i,j] = b.dataset.delN.split(":").map(Number); G.clips[i].narr.splice(j,1); }
   renderGuion(); guardar(true);
 });
-function guardar(ahora){
+function guardar(ahora, borrado=false){
   clearTimeout(saveT);
+  const vi = S.vi;
+  if (G && !borrado) S.guion.videos[vi] = fromUI(G);
   saveT = setTimeout(async () => {
-    const r = await api("/api/guion", fromUI(G));
-    if (r.ok){ S.guion = r.guion; S.gv = r.guion_v;
+    const r = await api("/api/guion", S.guion);
+    if (r.ok){ S.guion = r.guion; S.gv = r.guion_v; poll();
+      if (!G || vi !== S.vi) return;
       // el servidor puede mover cortes para no partir frases: reflejarlo
-      const nuevo = toUI(r.guion); const cambio = JSON.stringify(nuevo.clips.map(c=>[c.desde,c.segundos])) !== JSON.stringify(G.clips.map(c=>[+c.desde,+c.segundos]));
+      const nuevo = toUI(r.guion.videos[vi]); const cambio = JSON.stringify(nuevo.clips.map(c=>[c.desde,c.segundos])) !== JSON.stringify(G.clips.map(c=>[+c.desde,+c.segundos]));
       if (cambio && ahora){ G = nuevo; renderGuion(); toast("Ajusté un corte para no partir una frase."); }
     } else toast("No pude guardar el guion: " + r.error, true);
   }, ahora ? 50 : 700);
@@ -577,12 +634,13 @@ let pollT;
 async function poll(){
   clearTimeout(pollT);
   try{
-    const d = await api(`/api/estado?av=${S.av}&gv=${S.gv}`);
+    const d = await api(`/api/estado?av=${S.av}&gv=${S.gv}${S.fmts ? "" : "&fmt=1"}`);
     S.cfg = d.cfg; S.job = d.job;
     let tomasCambio = false;
     if ("analisis" in d){ S.analisis = d.analisis; S.av = d.analisis_v; tomasCambio = true; }
-    if ("guion" in d){ S.guion = d.guion; S.gv = d.guion_v; G = d.guion ? toUI(d.guion) : null; if (!$("#pan-g").contains(document.activeElement)) renderGuion(); }
-    renderSide(d); renderSteps(d); renderLog(d.log);
+    if (d.formatos){ S.fmts = d.formatos; S.orden = d.orden_formatos; }
+    if ("guion" in d){ S.guion = d.guion; S.gv = d.guion_v; cargarReel(S.vi); if (!$("#pan-g").contains(document.activeElement)) renderGuion(); }
+    renderSide(d); renderFmts(); renderSteps(d); renderLog(d.log);
     if (tomasCambio) renderTomas();
     pollT = setTimeout(poll, d.job.corriendo ? 900 : 3000);
   }catch(e){

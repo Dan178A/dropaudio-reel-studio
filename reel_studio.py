@@ -37,23 +37,68 @@ CTA = "Revisas. Escuchas. Luego pagas."
 
 GUION = """Eres editor de reels de DropAudio CCS (audífonos KZ originales en Venezuela; entrega en moto en Caracas,
 Guarenas y Guatire; el cliente revisa y prueba ANTES de pagar; 7 días de garantía; precios solo en $).
-Arma un reel vertical de 30 a 40 segundos con el guion "Así compras":
-  gancho -> paso 1 Elige tu modelo -> 2 Escríbenos -> 3 Vamos a ti (moto) -> 4 Lo pruebas ahí mismo
-  -> 5 Y solo entonces, pagas -> cta.  Si no hay tomas para un paso, sáltalo.
+Arma UN reel vertical de 30 a 40 segundos de formato «{titulo}» con esta estructura:
+  {estructura}
+Si no hay tomas para un paso, sáltalo. Usa SOLO los archivos del material.
 Reglas:
-- El gancho es una frase de PROBLEMA del cliente (ej. "¿Pagas antes y rezas que llegue?"), máx. 7 palabras.
+- El gancho es una frase corta (máx. 7 palabras) que detiene el scroll, en la línea de: "{gancho_ej}".
   Si hay una toma de persona hablando a cámara, úsala para el gancho.
 - NUNCA cortes una frase: si un clip tiene habla, 'desde' y 'hasta' deben caer fuera de las frases
   (usa los tiempos de 'habla'). Incluye completas las frases útiles.
 - Clips de 2 a 12 s. Fotos: 'desde' 0 y 'hasta' 3 a 5. No repitas el mismo tramo.
 - Narración: frases cortas (máx. 12 palabras), tono cercano venezolano, solo sobre clips SIN habla.
   'en' es el segundo dentro del clip. No nombres clientes ni des teléfonos de clientes.
-- Prefiere tomas con usable alto e interes alto.
+- Prefiere tomas con usable (u) alto e interés (i) alto.
 Responde SOLO con JSON:
-{"gancho": "...", "promesa": "frase corta bajo el gancho",
- "clips": [{"archivo": "...", "desde": 0.0, "hasta": 0.0, "paso": "gancho|1|2|3|4|5|cta", "motivo": "..."}],
- "narracion": [{"clip": 0, "en": 0.3, "texto": "..."}]}
+{{"gancho": "...", "promesa": "frase corta bajo el gancho",
+ "clips": [{{"archivo": "...", "desde": 0.0, "hasta": 0.0, "paso": "gancho|1|2|3|4|5|cta", "motivo": "..."}}],
+ "narracion": [{{"clip": 0, "en": 0.3, "texto": "..."}}]}}
 """
+
+# Formatos de la serie. «nucleo»: tipos de toma que definen el formato; «apoyo»: los que lo completan.
+# «reglas»: qué tipos buscar en cada paso cuando no hay modelo de texto (o si falla).
+FORMATOS = {
+    "unboxing": {
+        "titulo": "Unboxing", "kicker": "UNBOXING", "gancho_ej": "¿Original o réplica? Ábrelo conmigo",
+        "promesa": "Sellado de fábrica ↓",
+        "pasos": {"1": "Sellado de fábrica", "2": "Lo abrimos", "3": "Qué trae", "4": "De cerca", "5": "Precio"},
+        "estructura": "gancho -> 1 caja sellada -> 2 abriendo -> 3 qué trae (accesorios, cables) -> 4 detalle "
+                      "del producto -> 5 precio y garantía -> cta",
+        "nucleo": ["unboxing"], "apoyo": ["producto_detalle", "persona"],
+        "reglas": [("gancho", ["persona", "unboxing"]), ("1", ["unboxing", "producto_detalle"]), ("2", ["unboxing"]),
+                   ("3", ["unboxing", "producto_detalle"]), ("4", ["producto_detalle"]),
+                   ("cta", ["producto_detalle", "persona"])]},
+    "review": {
+        "titulo": "Review", "kicker": "REVIEW", "gancho_ej": "¿Unos KZ de $25 suenan bien?",
+        "promesa": "Te lo pruebo aquí ↓",
+        "pasos": {"1": "Qué es", "2": "Lo conectamos", "3": "Cómo suena", "4": "Detalles", "5": "¿Vale la pena?"},
+        "estructura": "gancho -> 1 qué es y para quién -> 2 conectarlo -> 3 prueba de sonido y reacción -> "
+                      "4 detalles de construcción -> 5 veredicto con precio -> cta",
+        "nucleo": ["prueba_sonido"], "apoyo": ["producto_detalle", "persona", "unboxing"],
+        "reglas": [("gancho", ["persona", "prueba_sonido"]), ("1", ["producto_detalle", "persona"]),
+                   ("2", ["prueba_sonido", "unboxing"]), ("3", ["prueba_sonido"]), ("4", ["producto_detalle"]),
+                   ("5", ["persona", "prueba_sonido"]), ("cta", ["producto_detalle", "persona"])]},
+    "entregas": {
+        "titulo": "Entregas", "kicker": "ENTREGA", "gancho_ej": "Así llegan tus KZ en Caracas",
+        "promesa": "En moto, hasta tu mano ↓",
+        "pasos": {"1": "Sale el pedido", "2": "En camino", "3": "Llegamos", "4": "Lo prueba", "5": "Paga después"},
+        "estructura": "gancho -> 1 pedido listo -> 2 POV en moto -> 3 llegada -> 4 el cliente prueba -> "
+                      "5 paga después de probar -> cta",
+        "nucleo": ["entrega_moto", "pago"], "apoyo": ["prueba_sonido", "persona", "producto_detalle"],
+        "reglas": [("gancho", ["entrega_moto", "persona"]), ("1", ["producto_detalle", "unboxing"]),
+                   ("2", ["entrega_moto"]), ("3", ["entrega_moto"]), ("4", ["prueba_sonido"]), ("5", ["pago"]),
+                   ("cta", ["pago", "producto_detalle", "persona"])]},
+    "asi_compras": {
+        "titulo": "Así compras", "kicker": "PASO", "gancho_ej": "¿Pagas antes y rezas que llegue?",
+        "promesa": "Así compras en DropAudio ↓", "pasos": PASOS,
+        "estructura": "gancho -> paso 1 Elige tu modelo -> 2 Escríbenos -> 3 Vamos a ti (moto) -> "
+                      "4 Lo pruebas ahí mismo -> 5 Y solo entonces, pagas -> cta",
+        "nucleo": ["entrega_moto", "prueba_sonido", "pago"], "apoyo": ["producto_detalle", "unboxing", "persona"],
+        "reglas": [("gancho", ["persona"]), ("1", ["producto_detalle", "unboxing"]), ("3", ["entrega_moto"]),
+                   ("4", ["prueba_sonido", "unboxing"]), ("5", ["pago"]),
+                   ("cta", ["producto_detalle", "persona", "otro"])]},
+}
+ORDEN_FORMATOS = ["unboxing", "review", "entregas", "asi_compras"]
 
 
 # ---------------------------------------------------------------- Ollama
@@ -97,11 +142,11 @@ def decidir(desc, habla, modelo):
             "interes": round(a["interes"]["score"] / 2, 3)}  # score viene en índice 0..2
 
 
-def escribir_guion(material, modelo, log=lambda *a: None, limite=600):
+def escribir_guion(material, modelo, log=lambda *a: None, limite=600, formato="asi_compras"):
     """Pide el guion en streaming: se ve el avance (pensando / escribiendo) y nunca se queda colgado sin aviso.
     Desactiva el «razonamiento» largo de los modelos que piensan (think: false) si el modelo lo admite."""
     body = {"model": modelo, "stream": True, "format": "json", "think": False, "options": {"num_ctx": 16384},
-            "messages": [{"role": "system", "content": GUION}, {"role": "user", "content": material}]}
+            "messages": [{"role": "system", "content": prompt_formato(formato)}, {"role": "user", "content": material}]}
     inicio, ultimo, txt, pensado = time.time(), 0, [], 0
     for intento in (1, 2):
         try:
@@ -320,20 +365,33 @@ def material_para_llm(datos, minimo, por_archivo=4, largo=170):
     return "Material disponible:" + "\n".join(lineas)
 
 
-def sin_cortar_frases(d, desde, hasta):
-    """Si un corte cae dentro de una frase, lo mueve al borde de la frase."""
+def sin_cortar_frases(d, desde, hasta, maximo=12.0):
+    """Si un corte cae dentro de una frase, lo mueve al borde de la frase. Primero intenta incluir la frase
+    completa; si eso deja el clip más largo que «maximo», la deja fuera (corta antes o después de ella)."""
+    a, b = desde, hasta
     for h in d["habla"]:
-        if h["ini"] < desde < h["fin"]:
-            desde = h["ini"]
-        if h["ini"] < hasta < h["fin"]:
-            hasta = h["fin"]
-    return max(0.0, desde), min(d["dur"] - 0.05, hasta)
+        if h["ini"] < a < h["fin"]:
+            a = h["ini"]
+        if h["ini"] < b < h["fin"]:
+            b = h["fin"]
+    if b - a > maximo and b - a > (hasta - desde) + 0.5:
+        a2, b2 = desde, hasta
+        for h in d["habla"]:
+            if h["ini"] < a2 < h["fin"]:
+                a2 = h["fin"]
+            if h["ini"] < b2 < h["fin"]:
+                b2 = h["ini"]
+        # si una sola «frase» de Whisper ocupa todo el tramo (monólogo largo), se respeta el tramo pedido
+        a, b = (a2, b2) if b2 - a2 >= 1.5 else (desde, hasta)
+    return max(0.0, a), min(d["dur"] - 0.05, b)
 
 
-def validar(sel, datos):
+def validar(sel, datos, permitidos=None):
     clips = []
     for c in sel.get("clips", []):
         d = datos.get(c.get("archivo"))
+        if permitidos is not None and c.get("archivo") not in permitidos:
+            continue
         if not d:
             continue
         if d["foto"]:
@@ -346,29 +404,159 @@ def validar(sel, datos):
                       "segundos": round(hasta - desde, 2), "paso": str(c.get("paso", "")), "motivo": c.get("motivo", "")})
     sel["clips"] = clips
     sel["narracion"] = [n for n in sel.get("narracion", []) if 0 <= int(n.get("clip", -1)) < len(clips) and n.get("texto")]
-    sel.setdefault("gancho", "¿Pagas antes y rezas que llegue?")
-    sel.setdefault("promesa", "Así compras en DropAudio ↓")
+    f = FORMATOS.get(sel.get("formato"), FORMATOS["asi_compras"])
+    if not sel.get("gancho"):
+        sel["gancho"] = f["gancho_ej"]
+    sel.setdefault("promesa", f["promesa"])
     return sel
 
 
-def guion_por_reglas(datos, minimo):
-    """Respaldo sin modelo de texto: una toma buena por paso, con frases completas."""
-    orden = [("gancho", ["persona"]), ("1", ["producto_detalle", "unboxing"]), ("3", ["entrega_moto"]),
-             ("4", ["prueba_sonido", "unboxing"]), ("5", ["pago"]), ("cta", ["producto_detalle", "persona", "otro"])]
+def prompt_formato(formato):
+    f = FORMATOS.get(formato, FORMATOS["asi_compras"])
+    return GUION.format(titulo=f["titulo"], estructura=f["estructura"], gancho_ej=f["gancho_ej"])
+
+
+def guion_por_reglas(datos, minimo, formato="asi_compras"):
+    """Respaldo sin modelo de texto: la mejor toma para cada paso del formato, sin repetir tramos.
+    Junta tomas buenas seguidas del mismo archivo (hasta ~6 s) para que el reel no quede demasiado corto."""
     tomas = sorted(((d, t) for d in datos.values() for t in d["tomas"] if t["usable"] >= minimo),
                    key=lambda x: x[1]["usable"] * x[1]["interes"], reverse=True)
     usados, clips = set(), []
-    for paso, tipos in orden:
+    for paso, tipos in FORMATOS.get(formato, FORMATOS["asi_compras"])["reglas"]:
         for d, t in tomas:
-            if t["tipo"] in tipos and d["archivo"] not in usados:
-                usados.add(d["archivo"])
-                clips.append({"archivo": d["archivo"], "desde": t["inicio"], "hasta": t["inicio"] + t["dur"],
-                              "paso": paso, "motivo": f"{t['tipo']} (reglas)"})
+            if t["tipo"] in tipos and (d["archivo"], t["inicio"]) not in usados:
+                usados.add((d["archivo"], t["inicio"]))
+                hasta = t["inicio"] + t["dur"]
+                for s in sorted(d["tomas"], key=lambda x: x["inicio"]):  # alargar con las tomas buenas siguientes
+                    if s["inicio"] >= hasta - 0.01 and s["inicio"] < hasta + 0.01 and s["usable"] >= minimo \
+                            and hasta - t["inicio"] < 6 and (d["archivo"], s["inicio"]) not in usados:
+                        usados.add((d["archivo"], s["inicio"])); hasta = s["inicio"] + s["dur"]
+                clips.append({"archivo": d["archivo"], "desde": t["inicio"], "hasta": hasta,
+                              "paso": paso, "motivo": f"{TIPOS.get(t['tipo'], t['tipo'])} (reglas)"})
                 break
     return {"clips": clips, "narracion": []}
 
 
+def planear_serie(datos, minimo, formatos, max_por=2):
+    """Reparte los ARCHIVOS entre varios reels: cada archivo va a un solo reel (no se repite material).
+    Cada archivo cuenta como el tipo de toma que más pesa en él. Devuelve (planes, avisos)."""
+    info = []
+    for d in datos.values():
+        buenas = [t for t in d["tomas"] if t["usable"] >= minimo]
+        if not buenas:
+            continue
+        peso = {}
+        for t in buenas:
+            peso[t["tipo"]] = peso.get(t["tipo"], 0) + t["usable"] * (0.5 + t["interes"]) * t["dur"]
+        tipo = max(peso, key=peso.get)
+        info.append({"archivo": d["archivo"], "tipo": tipo, "peso": peso[tipo], "seg": sum(t["dur"] for t in buenas)})
+    info.sort(key=lambda x: x["peso"], reverse=True)
+    usados, planes, avisos, cuenta = set(), [], [], {}
+    for ronda in range(max_por):
+        for fk in formatos:
+            f = FORMATOS.get(fk)
+            if not f:
+                continue
+            libres = [x for x in info if x["archivo"] not in usados]
+            nucleo = [x for x in libres if x["tipo"] in f["nucleo"]]
+            if not nucleo:
+                if ronda == 0:
+                    avisos.append(f"{f['titulo']}: no hay tomas de {' / '.join(TIPOS[t].lower() for t in f['nucleo'])}. "
+                                  "Graba ese tipo de toma para este formato.")
+                continue
+            elegidos, seg = [], 0.0
+            for x in nucleo:  # el corazón del reel
+                if seg >= 20 or len(elegidos) >= 5:
+                    break
+                elegidos.append(x); seg += x["seg"]
+            for x in (x for x in libres if x["tipo"] in f["apoyo"]):  # lo completa hasta tener material de sobra
+                if seg >= 50 or len(elegidos) >= 9:
+                    break
+                elegidos.append(x); seg += x["seg"]
+            if seg < 20:
+                if ronda == 0:
+                    avisos.append(f"{f['titulo']}: solo hay {seg:.0f} s de tomas buenas; hace falta más material.")
+                continue
+            usados.update(x["archivo"] for x in elegidos)
+            cuenta[fk] = cuenta.get(fk, 0) + 1
+            planes.append({"formato": fk, "n": cuenta[fk], "archivos": [x["archivo"] for x in elegidos],
+                           "segundos_material": round(seg, 1)})
+    return planes, avisos
+
+
+def hacer_serie(carpeta, cfg, log):
+    """Paso 2 en modo serie: varios reels separados por formato, cada uno con su guion y su material."""
+    from concurrent.futures import ThreadPoolExecutor
+    datos = json.load(open(os.path.join(carpeta, "analisis.json"), encoding="utf-8"))
+    formatos = [f for f in cfg.get("formatos", ORDEN_FORMATOS) if f in FORMATOS] or ORDEN_FORMATOS
+    planes, avisos = planear_serie(datos, cfg["minimo"], formatos, int(cfg.get("max_por_formato", 2)))
+    for a in avisos:
+        log("error", a)
+    if not planes:
+        raise RuntimeError("No alcanza el material para ningún reel. Revisa el mínimo «usable» o analiza más tomas.")
+    prefijo = (cfg.get("nombre") or "reel").strip() or "reel"
+    log("estado", f"Escribiendo {len(planes)} reels: " + ", ".join(f"{FORMATOS[p['formato']]['titulo']} {p['n']}" for p in planes))
+    log("progreso", (0, len(planes)))
+    hechos = [0]; lock = threading.Lock()
+
+    def uno(plan):
+        sub = {a: datos[a] for a in plan["archivos"]}
+        titulo = f"{FORMATOS[plan['formato']]['titulo']} {plan['n']}"
+        if cfg["escritor"] == "(reglas, sin IA)":
+            sel = guion_por_reglas(sub, cfg["minimo"], plan["formato"])
+        else:
+            try:
+                sel = escribir_guion(material_para_llm(sub, cfg["minimo"]), cfg["escritor"],
+                                     lambda t, x: log(t, f"{titulo}: {x}"), formato=plan["formato"])
+            except Exception as e:
+                log("error", f"{titulo}: el modelo falló ({e}). Uso reglas; puedes editarlo.")
+                sel = guion_por_reglas(sub, cfg["minimo"], plan["formato"])
+        sel["formato"], sel["titulo"] = plan["formato"], titulo
+        sel["nombre"] = f"{prefijo}_{plan['formato']}_{plan['n']:02d}"
+        sel = validar(sel, datos, set(plan["archivos"]))
+        if not sel["clips"]:  # el modelo devolvió algo inservible: reglas
+            sel.update(validar(dict(guion_por_reglas(sub, cfg["minimo"], plan["formato"]), formato=plan["formato"]),
+                               datos, set(plan["archivos"])))
+        with lock:
+            hechos[0] += 1
+        log("progreso", (hechos[0], len(planes)))
+        return sel
+
+    with ThreadPoolExecutor(min(3, len(planes))) as ex:
+        videos = list(ex.map(uno, planes))
+    videos = [v for v in videos if v["clips"]]
+    for v in videos:
+        dur = sum(c["segundos"] for c in v["clips"])
+        if dur < 20:
+            avisos.append(f"{v['titulo']}: quedó de {dur:.0f} s; le falta material (revísalo o quítalo).")
+            log("error", avisos[-1])
+    serie = {"videos": videos, "avisos": avisos}
+    guardar_serie(carpeta, serie)
+    return serie
+
+
+def guardar_serie(carpeta, serie):
+    tmp = os.path.join(carpeta, "serie.json.tmp")
+    json.dump(serie, open(tmp, "w", encoding="utf-8"), ensure_ascii=False, indent=1)
+    os.replace(tmp, os.path.join(carpeta, "serie.json"))
+
+
+def leer_serie(carpeta, nombre_defecto="reel_auto_01"):
+    """serie.json; si solo existe el seleccion.json de antes, lo muestra como un reel «Así compras»."""
+    p = os.path.join(carpeta, "serie.json")
+    if os.path.exists(p):
+        return json.load(open(p, encoding="utf-8"))
+    p = os.path.join(carpeta, "seleccion.json")
+    if os.path.exists(p):
+        sel = json.load(open(p, encoding="utf-8"))
+        sel.setdefault("formato", "asi_compras"); sel.setdefault("titulo", "Así compras 1")
+        sel.setdefault("nombre", nombre_defecto)
+        return {"videos": [sel], "avisos": []}
+    return None
+
+
 def hacer_guion(carpeta, cfg, log):
+    """Un solo reel «Así compras» (modo clásico; lo usa la interfaz Tkinter)."""
     datos = json.load(open(os.path.join(carpeta, "analisis.json"), encoding="utf-8"))
     if cfg["escritor"] == "(reglas, sin IA)":
         sel = guion_por_reglas(datos, cfg["minimo"])
@@ -429,14 +617,14 @@ def png_gancho(texto, promesa, dest):
     im.save(dest)
 
 
-def png_paso(num, titulo, dest):
+def png_paso(num, titulo, dest, kicker="PASO"):
     from PIL import Image, ImageDraw
     im = Image.new("RGBA", (1080, 1920), (0, 0, 0, 0)); d = ImageDraw.Draw(im)
     a, b = fuente("PJ.ttf", 30, 700), fuente("SG.ttf", 60, 700)
-    w = max(d.textlength(f"PASO 0{num}", font=a), d.textlength(titulo, font=b)) + 120
+    w = max(d.textlength(f"{kicker} 0{num}", font=a), d.textlength(titulo, font=b)) + 120
     d.rounded_rectangle((70, 230, 70 + w, 400), 30, fill=CARD + (235,), outline=ORO, width=3)
     d.rectangle((70, 260, 78, 370), fill=ORO)
-    d.text((112, 262), f"PASO 0{num}", font=a, fill=ORO); d.text((112, 300), titulo, font=b, fill=HUESO)
+    d.text((112, 262), f"{kicker} 0{num}", font=a, fill=ORO); d.text((112, 300), titulo, font=b, fill=HUESO)
     im.save(dest)
 
 
@@ -456,11 +644,34 @@ def png_cta(dest):
 
 # ---------------------------------------------------------------- 3. CapCut
 def armar(carpeta, nombre, cfg, log):
+    """Modo clásico: un borrador desde seleccion.json."""
+    sel = json.load(open(os.path.join(carpeta, "seleccion.json"), encoding="utf-8"))
+    return armar_sel(carpeta, sel, nombre, cfg, log)
+
+
+def armar_serie(carpeta, cfg, log, cuales=None):
+    """Un borrador de CapCut por cada reel de serie.json. Devuelve [(nombre, segundos)]."""
+    serie = leer_serie(carpeta, cfg.get("nombre", "reel_auto_01"))
+    if not serie or not serie["videos"]:
+        raise RuntimeError("No hay guiones: primero pulsa «Escribir guiones».")
+    hechos = []
+    videos = [v for i, v in enumerate(serie["videos"]) if cuales is None or i in cuales]
+    for k, sel in enumerate(videos):
+        log("progreso", (k, len(videos)))
+        log("estado", f"Creando {sel.get('titulo', '')} → «{sel['nombre']}» ({k + 1}/{len(videos)})")
+        hechos.append((sel["nombre"], armar_sel(carpeta, sel, sel["nombre"], cfg, log)))
+    log("progreso", (len(videos), len(videos)))
+    return hechos
+
+
+def armar_sel(carpeta, sel, nombre, cfg, log):
     import pycapcut as cc
     from pycapcut import trange_seconds, tim
 
-    sel = json.load(open(os.path.join(carpeta, "seleccion.json"), encoding="utf-8"))
-    out = os.path.join(carpeta, "_reel_studio"); os.makedirs(out, exist_ok=True)
+    if not sel.get("clips"):
+        raise RuntimeError(f"«{nombre}» no tiene clips.")
+    fmt = FORMATOS.get(sel.get("formato"), FORMATOS["asi_compras"])
+    out = os.path.join(carpeta, "_reel_studio", re.sub(r"[^\w\-]+", "_", nombre)); os.makedirs(out, exist_ok=True)
     script = cc.DraftFolder(cfg["drafts"]).create_draft(nombre, 1080, 1920, allow_replace=True)
     script.add_track(cc.TrackType.video).add_track(cc.TrackType.video, "textos", relative_index=1)
     script.add_track(cc.TrackType.video, "cta", relative_index=2)
@@ -494,9 +705,9 @@ def armar(carpeta, nombre, cfg, log):
     cues = []
     for i, c in enumerate(sel["clips"]):
         p = c.get("paso", "")
-        if p in PASOS and p not in paso_visto and i > 0:
+        if p in fmt["pasos"] and p not in paso_visto and i > 0:
             paso_visto.add(p)
-            png_paso(p, PASOS[p], png := os.path.join(out, f"paso{p}.png"))
+            png_paso(p, fmt["pasos"][p], png := os.path.join(out, f"paso{p}.png"), fmt["kicker"])
             overlay(png, inicio[i], min(3.5, c["segundos"]))
             cues.append(inicio[i])
     ult = sel["clips"][-1]["segundos"]

@@ -21,7 +21,7 @@ CFG_FILE = os.path.join(BASE, "studio_config.json")
 CFG = {"carpeta": os.path.join(AQUI, "Videos Dropaudioccs"), "vision": "gemma3:4b", "jev": "nimble:latest",
        "escritor": "glm-5.3:cloud", "whisper": "small", "paso": 3.0, "minimo": 0.5, "drafts": core.CAPCUT_DRAFTS,
        "vol_clips": 1.0, "vol_musica": 0.25, "musica": True, "nombre": "reel_auto_01", "rehacer": False,
-       "simultaneos": 6, "saltar_repetidos": True}
+       "simultaneos": 6, "saltar_repetidos": True, "formatos": list(core.ORDEN_FORMATOS), "max_por_formato": 2}
 if os.path.exists(CFG_FILE):
     CFG.update(json.load(open(CFG_FILE, encoding="utf-8")))
 
@@ -102,15 +102,17 @@ def t_analizar():
 
 
 def t_guion():
-    sel = core.hacer_guion(CFG["carpeta"], CFG, evento)
-    ESTADO["guion_v"] += 1
-    return f"Guion listo: {len(sel['clips'])} clips, {sum(c['segundos'] for c in sel['clips']):.1f} s."
+    serie = core.hacer_serie(CFG["carpeta"], CFG, evento)
+    ESTADO["guion_v"] += 1; ESTADO["borrador"] = None
+    return f"Serie lista: {len(serie['videos'])} reels (" + ", ".join(v["titulo"] for v in serie["videos"]) + ")."
 
 
 def t_armar():
-    t = core.armar(CFG["carpeta"], CFG["nombre"], CFG, evento)
-    ESTADO["borrador"] = {"nombre": CFG["nombre"], "dur": round(t, 1), "carpeta": CFG["carpeta"]}
-    return f"Borrador «{CFG['nombre']}» creado en CapCut ({t:.1f} s)."
+    hechos = core.armar_serie(CFG["carpeta"], CFG, evento)
+    ESTADO["borrador"] = {"nombres": [n for n, _ in hechos], "durs": [round(t, 1) for _, t in hechos],
+                          "nombre": ", ".join(n for n, _ in hechos), "dur": round(sum(t for _, t in hechos), 1),
+                          "carpeta": CFG["carpeta"]}
+    return f"{len(hechos)} borradores creados en CapCut: " + ", ".join(n for n, _ in hechos) + "."
 
 
 TAREAS = {"analizar": t_analizar, "guion": t_guion, "armar": t_armar, "modelos": t_modelos}
@@ -171,7 +173,11 @@ class H(BaseHTTPRequestHandler):
             if v != ESTADO["analisis_v"]:
                 out["analisis"] = leer("analisis.json")
             if gv != ESTADO["guion_v"]:
-                out["guion"] = leer("seleccion.json")
+                out["guion"] = core.leer_serie(CFG["carpeta"], CFG.get("nombre", "reel_auto_01"))
+            if q.get("fmt"):
+                out["formatos"] = {k: {"titulo": f["titulo"], "kicker": f["kicker"], "pasos": f["pasos"],
+                                       "nucleo": f["nucleo"]} for k, f in core.FORMATOS.items()}
+                out["orden_formatos"] = core.ORDEN_FORMATOS
             self._json(out)
         elif u.path == "/thumb":
             p = miniatura(q.get("f", [""])[0], float(q.get("t", ["0"])[0]))
@@ -209,16 +215,18 @@ class H(BaseHTTPRequestHandler):
                 nombre = u.path.rsplit("/", 1)[1]
                 ok = nombre in TAREAS and lanzar(nombre, TAREAS[nombre])
                 self._json({"ok": ok}, 200 if ok else 409)
-            elif u.path == "/api/guion":
-                sel = self._body()
+            elif u.path == "/api/guion":  # recibe la serie completa {"videos": [...]}
+                serie = self._body()
                 datos = leer("analisis.json") or {}
-                for c in sel.get("clips", []):
-                    c["hasta"] = float(c.get("desde", 0)) + float(c.get("segundos", 0))
-                sel = core.validar(sel, datos)
-                json.dump(sel, open(os.path.join(CFG["carpeta"], "seleccion.json"), "w", encoding="utf-8"),
-                          ensure_ascii=False, indent=1)
+                for sel in serie.get("videos", []):
+                    for c in sel.get("clips", []):
+                        c["hasta"] = float(c.get("desde", 0)) + float(c.get("segundos", 0))
+                    core.validar(sel, datos)
+                    sel["nombre"] = (sel.get("nombre") or "reel").strip()
+                serie.setdefault("avisos", [])
+                core.guardar_serie(CFG["carpeta"], serie)
                 ESTADO["guion_v"] += 1
-                self._json({"ok": True, "guion": sel, "guion_v": ESTADO["guion_v"]})
+                self._json({"ok": True, "guion": serie, "guion_v": ESTADO["guion_v"]})
             else:
                 self.send_response(404); self.end_headers()
         except Exception as e:
