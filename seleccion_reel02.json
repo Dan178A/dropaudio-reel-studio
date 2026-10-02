@@ -1,0 +1,17 @@
+{
+ "musica": "musica_reel02.wav",
+ "clips": [
+  {"archivo": "PXL_20261001_172815200.mp4", "foto": false, "desde": 0.0, "segundos": 3.5},
+  {"archivo": "PXL_20261001_172815200.mp4", "foto": false, "desde": 3.5, "segundos": 10.0},
+  {"archivo": "PXL_20261001_185852494.mp4", "foto": false, "desde": 0.0, "segundos": 4.5},
+  {"archivo": "PXL_20261001_174442016.mp4", "foto": false, "desde": 0.0, "segundos": 3.0}
+ ],
+ "overlays": [
+  {"png": "overlays/01_gancho.png",   "desde": 0.0,  "segundos": 3.5},
+  {"png": "overlays/02_entregas.png", "desde": 3.5,  "segundos": 4.4},
+  {"png": "overlays/03_castor.png",   "desde": 7.9,  "segundos": 2.3},
+  {"png": "overlays/04_y12.png",      "desde": 10.2, "segundos": 3.3},
+  {"png": "overlays/05_prueba.png",   "desde": 13.5, "segundos": 4.5},
+  {"png": "overlays/06_cta.png",      "desde": 18.0, "segundos": 3.0}
+ ]
+}

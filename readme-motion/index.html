@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1920, height=1080" />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" />
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <style>
+      :root {
+        --bg: #090807; --card: #16130f; --card2: #1d1914; --line: #2b251c; --line2: #3a3226;
+        --gold: #cda860; --gold2: #e2be72; --gold3: #967337; --bone: #f0ede8; --muted: #a79f92;
+        --f-title: "Space Grotesk", system-ui, sans-serif;
+        --f-text: "Plus Jakarta Sans", system-ui, sans-serif;
+      }
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body { width: 1920px; height: 1080px; overflow: hidden; background: var(--bg); }
+      #root { position: relative; width: 1920px; height: 1080px; overflow: hidden; color: var(--bone); font-family: var(--f-text);
+        background: radial-gradient(1200px 700px at 70% 20%, #1c1710 0%, var(--bg) 60%); }
+      .scene { position: absolute; inset: 0; }
+      .kicker { font: 600 22px/1 var(--f-text); letter-spacing: .18em; text-transform: uppercase; color: var(--gold); }
+      h1, h2 { font-family: var(--f-title); letter-spacing: -.045em; font-weight: 700; }
+      em { font-style: normal; color: var(--gold2); }
+
+      /* S1 intro */
+      #s1 { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 34px; }
+      #s1 .logo { display: flex; align-items: center; gap: 34px; }
+      #s1 svg { width: 150px; height: 150px; color: var(--gold); }
+      #s1 h1 { font-size: 150px; line-height: 1; }
+      #s1 .tag { font-size: 40px; color: var(--muted); }
+      #s1 .tag b { color: var(--bone); font-weight: 600; }
+
+      /* S2 pipeline */
+      #s2 { padding: 110px 120px; }
+      #s2 h2 { font-size: 76px; line-height: 1.05; margin-top: 22px; max-width: 1500px; }
+      .pipe { position: absolute; left: 120px; right: 120px; top: 520px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 56px; }
+      .rail { position: absolute; left: 160px; right: 160px; top: 600px; height: 4px; background: var(--gold3); transform-origin: left center; }
+      .node { position: relative; background: var(--card); border: 2px solid var(--line2); border-radius: 26px; padding: 34px 32px 36px; min-height: 330px; }
+      .node .num { width: 64px; height: 64px; border-radius: 50%; display: grid; place-items: center; background: var(--gold); color: #120f0a; font: 700 30px/1 var(--f-title); margin-bottom: 26px; }
+      .node h3 { font: 700 42px/1.1 var(--f-title); letter-spacing: -.03em; margin-bottom: 14px; }
+      .node p { font-size: 26px; line-height: 1.4; color: var(--muted); }
+      .node p b { color: var(--bone); font-weight: 600; }
+
+      /* S3 app */
+      #s3 { padding: 110px 120px; }
+      #s3 .copy { position: absolute; left: 120px; top: 150px; width: 560px; }
+      #s3 h2 { font-size: 84px; line-height: 1.02; margin: 22px 0 30px; }
+      #s3 ul { list-style: none; display: grid; gap: 18px; font-size: 30px; }
+      #s3 li { display: flex; gap: 16px; align-items: baseline; }
+      #s3 li::before { content: ""; width: 14px; height: 14px; border-radius: 4px; background: var(--gold); flex: none; transform: translateY(-3px); }
+      .win { position: absolute; left: 740px; top: 150px; width: 1080px; border-radius: 22px; overflow: hidden; border: 2px solid var(--line2); box-shadow: 0 40px 120px rgba(0,0,0,.6); background: #0f0d0a; }
+      .win .bar { height: 46px; display: flex; align-items: center; gap: 10px; padding: 0 18px; background: #14110d; border-bottom: 1px solid var(--line); font-size: 18px; color: var(--muted); }
+      .win .bar i { width: 13px; height: 13px; border-radius: 50%; background: var(--line2); display: block; }
+      .win .bar span { margin-left: 12px; }
+      .win .shot { height: 635px; overflow: hidden; }
+      .win img { display: block; width: 1080px; height: 675px; }
+
+      /* S4 reel */
+      #s4 { padding: 110px 120px; }
+      .phone { position: absolute; left: 1210px; top: 70px; width: 530px; height: 942px; border-radius: 54px; border: 10px solid #1f1b15; overflow: hidden; background: #000; box-shadow: 0 40px 120px rgba(0,0,0,.6); }
+      .phone img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+      .phone .img2 { opacity: 0; }
+      .chip { position: absolute; left: 34px; top: 70px; background: #232019; border: 2px solid var(--gold); color: var(--gold2); border-radius: 99px; padding: 12px 24px; font: 700 26px/1 var(--f-text); }
+      #s4 .copy { position: absolute; left: 120px; top: 150px; width: 960px; }
+      #s4 h2 { font-size: 84px; line-height: 1.02; margin: 22px 0 46px; }
+      .steps { display: grid; gap: 16px; }
+      .st { display: flex; align-items: center; gap: 22px; font-size: 34px; font-weight: 600; color: var(--muted); }
+      .st span { font: 700 26px/1 var(--f-title); color: var(--gold); border: 2px solid var(--gold3); border-radius: 12px; padding: 10px 14px; }
+      .stats { display: flex; gap: 22px; margin-top: 56px; }
+      .stat { background: var(--card); border: 2px solid var(--line2); border-radius: 20px; padding: 22px 28px; }
+      .stat b { display: block; font: 700 48px/1 var(--f-title); color: var(--gold2); letter-spacing: -.03em; }
+      .stat small { font-size: 22px; color: var(--muted); }
+
+      /* S5 outro */
+      #s5 { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 40px; }
+      #s5 .logo { display: flex; align-items: center; gap: 26px; }
+      #s5 svg { width: 110px; height: 110px; color: var(--gold); }
+      #s5 h1 { font-size: 110px; line-height: 1; }
+      .stack { display: flex; flex-wrap: wrap; justify-content: center; gap: 16px; max-width: 1500px; }
+      .stack span { background: var(--card2); border: 2px solid var(--line2); border-radius: 99px; padding: 14px 26px; font-size: 28px; font-weight: 600; }
+      #s5 .tag { font-size: 34px; color: var(--muted); }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="17" data-width="1920" data-height="1080">
+
+      <!-- S1 · intro -->
+      <section id="s1" class="scene clip" data-start="0" data-duration="3.2" data-track-index="0">
+        <div class="logo">
+          <svg viewBox="0 0 24 24"><path id="wave1" d="M2 12h3l2-6 4 14 4-18 3 10h4" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" pathLength="1" stroke-dasharray="1" stroke-dashoffset="1"/></svg>
+          <h1 id="t1">Reel Studio</h1>
+        </div>
+        <p class="tag" id="tag1">De los videos del teléfono a un <b>reel en CapCut</b>, con IA local</p>
+      </section>
+
+      <!-- S2 · pipeline -->
+      <section id="s2" class="scene clip" data-start="3.2" data-duration="4.6" data-track-index="0">
+        <p class="kicker" id="k2">Cómo funciona</p>
+        <h2 id="h2">Tú grabas. La IA elige las tomas, escribe el guion y <em>arma el borrador</em>.</h2>
+        <div class="rail" id="rail"></div>
+        <div class="pipe">
+          <div class="node n2"><div class="num">1</div><h3>Carpeta</h3><p><b>~80 archivos</b> del Pixel, WhatsApp y fotos HEIC</p></div>
+          <div class="node n2"><div class="num">2</div><h3>Analizar</h3><p><b>Whisper</b> transcribe, <b>gemma3</b> mira y <b>Jev</b> decide qué sirve</p></div>
+          <div class="node n2"><div class="num">3</div><h3>Guion</h3><p>Gancho y 5 pasos de <b>«Así compras»</b>, sin cortar frases</p></div>
+          <div class="node n2"><div class="num">4</div><h3>CapCut</h3><p>Borrador <b>1080×1920</b> con clips, marca, música y voz</p></div>
+        </div>
+      </section>
+
+      <!-- S3 · app -->
+      <section id="s3" class="scene clip" data-start="7.8" data-duration="3.8" data-track-index="0">
+        <div class="copy">
+          <p class="kicker k3">App de escritorio</p>
+          <h2 class="h3">Tres pasos, <em>un clic</em> cada uno.</h2>
+          <ul>
+            <li class="li3">Progreso con % y minutos</li>
+            <li class="li3">Tomas con miniaturas y puntaje</li>
+            <li class="li3">Guion editable por paso</li>
+            <li class="li3">100% local con Ollama</li>
+          </ul>
+        </div>
+        <div class="win" id="win">
+          <div class="bar"><i></i><i></i><i></i><span>Reel Studio · DropAudio CCS</span></div>
+          <div class="shot"><img src="assets/studio_ui.png" alt="Interfaz de Reel Studio" /></div>
+        </div>
+      </section>
+
+      <!-- S4 · result -->
+      <section id="s4" class="scene clip" data-start="11.6" data-duration="3.4" data-track-index="0">
+        <div class="copy">
+          <p class="kicker k4">El resultado</p>
+          <h2 class="h4">Reels con <em>video real</em>, cara en cámara y entrega en moto.</h2>
+          <div class="steps">
+            <div class="st"><span>01</span>Elige tu modelo</div>
+            <div class="st"><span>02</span>Escríbenos</div>
+            <div class="st"><span>03</span>Vamos a ti</div>
+            <div class="st"><span>04</span>Lo pruebas ahí mismo</div>
+            <div class="st"><span>05</span>Y solo entonces, pagas</div>
+          </div>
+        </div>
+        <div class="phone" id="phone" data-layout-allow-overflow>
+          <img class="img1" src="assets/bg_castor.jpg" alt="" />
+          <img class="img2" src="assets/bg_modulos_y12.jpg" alt="" />
+          <div class="chip" id="chip">PASO 04 · Lo pruebas</div>
+        </div>
+      </section>
+
+      <!-- S5 · outro -->
+      <section id="s5" class="scene clip" data-start="15" data-duration="2" data-track-index="0">
+        <div class="logo">
+          <svg viewBox="0 0 24 24"><path d="M2 12h3l2-6 4 14 4-18 3 10h4" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <h1>Reel Studio</h1>
+        </div>
+        <div class="stack">
+          <span class="sk">Python</span><span class="sk">pywebview</span><span class="sk">Ollama</span><span class="sk">faster-whisper</span><span class="sk">pyCapCut</span><span class="sk">ffmpeg</span>
+        </div>
+        <p class="tag" id="tag5">Hecho para DropAudio CCS · Caracas</p>
+      </section>
+    </div>
+
+    <script>
+      window.__timelines = window.__timelines || {};
+      const tl = gsap.timeline({ paused: true });
+      const E = "power3.out";
+
+      // S1
+      tl.to("#wave1", { strokeDashoffset: 0, duration: 1.0, ease: "power2.inOut" }, 0.15)
+        .from("#t1", { x: -40, opacity: 0, duration: 0.7, ease: E }, 0.45)
+        .from("#tag1", { y: 26, opacity: 0, duration: 0.6, ease: E }, 0.9)
+        .to("#s1 > *", { opacity: 0, y: -20, duration: 0.35, ease: "power2.in" }, 2.85);
+
+      // S2 (starts 3.2)
+      tl.from("#k2", { y: 16, opacity: 0, duration: 0.4, ease: E }, 3.3)
+        .from("#h2", { y: 30, opacity: 0, duration: 0.6, ease: E }, 3.4)
+        .from("#rail", { scaleX: 0, duration: 1.6, ease: "power2.inOut" }, 3.9)
+        .from(".n2", { y: 50, opacity: 0, duration: 0.55, ease: E, stagger: 0.35 }, 3.95)
+        .to(".n2", { borderColor: "#967337", duration: 0.3, stagger: 0.35 }, 4.3)
+        .to("#s2 > *", { opacity: 0, duration: 0.35, ease: "power2.in" }, 7.45);
+
+      // S3 (starts 7.8)
+      tl.from(".k3", { y: 16, opacity: 0, duration: 0.4, ease: E }, 7.9)
+        .from(".h3", { y: 30, opacity: 0, duration: 0.6, ease: E }, 8.0)
+        .from("#win", { x: 120, opacity: 0, scale: 0.94, duration: 0.9, ease: E }, 8.0)
+        .from(".li3", { x: -24, opacity: 0, duration: 0.45, ease: E, stagger: 0.2 }, 8.5)
+        .to("#win img", { y: -40, duration: 2.6, ease: "none" }, 8.8)
+        .to("#s3 > *", { opacity: 0, duration: 0.35, ease: "power2.in" }, 11.25);
+
+      // S4 (starts 11.6)
+      tl.from(".k4", { y: 16, opacity: 0, duration: 0.4, ease: E }, 11.7)
+        .from(".h4", { y: 30, opacity: 0, duration: 0.6, ease: E }, 11.8)
+        .from("#phone", { y: 80, opacity: 0, duration: 0.8, ease: E }, 11.7)
+        .fromTo(".phone .img1", { scale: 1 }, { scale: 1.12, duration: 3.2, ease: "none" }, 11.6)
+        .to(".phone .img2", { opacity: 1, duration: 0.5, ease: "power1.inOut" }, 13.4)
+        .from(".st", { x: -24, opacity: 0, duration: 0.4, ease: E, stagger: 0.16 }, 12.2)
+        .to(".st:nth-child(4)", { color: "#f0ede8", duration: 0.3 }, 13.2)
+        .from("#chip", { scale: 0.6, opacity: 0, duration: 0.45, ease: "back.out(2)" }, 12.8)
+        .to("#s4 > *", { opacity: 0, duration: 0.35, ease: "power2.in" }, 14.65);
+
+      // S5 (starts 15)
+      tl.from("#s5 .logo", { scale: 0.9, opacity: 0, duration: 0.6, ease: E }, 15.05)
+        .from(".sk", { y: 20, opacity: 0, duration: 0.35, ease: E, stagger: 0.07 }, 15.3)
+        .from("#tag5", { opacity: 0, duration: 0.4 }, 15.8);
+
+      window.__timelines["main"] = tl;
+      tl.seek(0);
+    </script>
+  </body>
+</html>

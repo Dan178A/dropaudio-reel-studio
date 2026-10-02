@@ -1,0 +1,34 @@
+# Material crudo (videos y fotos del teléfono): no se sube
+Videos Dropaudioccs/
+videos/
+*.mp4
+*.MOV
+*.mov
+*.HEIC
+_reel_studio/
+_jpg/
+
+# Excepción: el video de presentación del README sí se sube
+!docs/media/*.mp4
+
+# Entorno y build de Python
+venv/
+.venv/
+__pycache__/
+*.pyc
+build/
+dist/
+
+# Generados por la app
+reel_studio.log
+studio_config.json
+musica_*.wav
+
+# Motion frames del README (proyecto HyperFrames)
+readme-motion/node_modules/
+readme-motion/renders/
+
+# Sistema
+Thumbs.db
+.DS_Store
+desktop.ini

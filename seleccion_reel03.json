@@ -1,0 +1,25 @@
+{
+ "musica": "auto",
+ "clips": [
+  {"archivo": "PXL_20261001_172815200.mp4", "foto": false, "desde": 0.0, "segundos": 3.5},
+  {"archivo": "PXL_20261001_172815200.mp4", "foto": false, "desde": 3.5, "segundos": null},
+  {"archivo": "PXL_20261001_185852494.mp4", "foto": false, "desde": 0.0, "segundos": null},
+  {"archivo": "PXL_20261001_174442016.mp4", "foto": false, "desde": 0.0, "segundos": null},
+  {"archivo": "PXL_20261001_180423256.mp4", "foto": false, "desde": 0.0, "segundos": null, "volumen": 0.3},
+  {"archivo": "PXL_20261001_182501820.jpg", "foto": true,  "desde": 0.0, "segundos": 7.0}
+ ],
+ "overlays": [
+  {"png": "overlays/01_gancho.png",        "clip": 0, "en": 0.0, "segundos": null},
+  {"png": "overlays/02_entregas.png",      "clip": 1, "en": 0.0, "segundos": 4.3},
+  {"png": "overlays/bg_castor.jpg",        "clip": 1, "en": 4.3, "segundos": 2.3, "zoom": [1.0, 1.06]},
+  {"png": "overlays/bg_modulos_y12.jpg",   "clip": 1, "en": 6.6, "segundos": 2.9, "zoom": [1.0, 1.06]},
+  {"png": "overlays/08_entrega.png",       "clip": 4, "en": 0.2, "segundos": null},
+  {"png": "overlays/05_prueba.png",        "clip": 5, "en": 0.0, "segundos": 3.9},
+  {"png": "overlays/06_cta.png",           "clip": 5, "en": 3.9, "segundos": null}
+ ],
+ "voces": [
+  {"audio": "voces/voz_moto.wav",   "clip": 4, "en": 0.4},
+  {"audio": "voces/voz_prueba.wav", "clip": 5, "en": 0.2},
+  {"audio": "voces/voz_cta.wav",    "clip": 5, "en": 4.3}
+ ]
+}
