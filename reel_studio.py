@@ -153,41 +153,113 @@ def transcribir(path, tam):
 
 
 # ---------------------------------------------------------------- 1. analizar
+def huella(img):
+    """Miniatura gris 24x24 para comparar fotogramas sin llamar a ningún modelo."""
+    from PIL import Image
+    with Image.open(img) as im:
+        return list(im.convert("L").resize((24, 24)).getdata())
+
+
+def parecidos(a, b, umbral):
+    return a is not None and b is not None and sum(abs(x - y) for x, y in zip(a, b)) / len(a) < umbral
+
+
 def analizar(carpeta, cfg, log, rehacer=False):
+    """Analiza en paralelo: varios archivos a la vez, Whisper en su propio turno y un solo ffmpeg por video.
+    Con «saltar_repetidos», un fotograma casi igual al anterior reutiliza la descripción en vez de llamar a la visión."""
+    import shutil
+    from concurrent.futures import ThreadPoolExecutor, as_completed
     salida = os.path.join(carpeta, "analisis.json")
     datos = {} if rehacer or not os.path.exists(salida) else json.load(open(salida, encoding="utf-8"))
     archivos = sorted(f for f in os.listdir(carpeta) if f.lower().endswith(VIDEO_EXT + FOTO_EXT))
-    tmp = os.path.join(tempfile.gettempdir(), "reel_studio_frame.jpg")
-    for i, nombre in enumerate(archivos, 1):
-        log("progreso", (i - 1, len(archivos)))
+    for nombre in archivos:
         if nombre in datos:
-            log("fila", datos[nombre]); continue
+            log("fila", datos[nombre])
+    pendientes = [f for f in archivos if f not in datos]
+    n = max(1, int(cfg.get("simultaneos", 6)))
+    saltar = bool(cfg.get("saltar_repetidos", True))
+    umbral = float(cfg.get("umbral_repetido", 5))  # diferencia media de gris (0-255): quieto ≈ 1-4, con movimiento > 10
+    guardar_lock, whisper_lock = threading.Lock(), threading.Lock()
+    hechos, ahorradas = [0], [0]
+    log("progreso", (0, len(pendientes)))
+    if not pendientes:
+        return datos
+    log("estado", f"Analizando {len(pendientes)} archivos nuevos, {n} a la vez"
+                  + (f" ({len(archivos) - len(pendientes)} ya estaban)" if len(pendientes) < len(archivos) else ""))
+    llamadas = ThreadPoolExecutor(n)  # tope de llamadas simultáneas a Ollama (visión + Jev)
+
+    def ventana(img, desc_previa, dicho, decision_previa):
+        desc = desc_previa if desc_previa is not None else describir(img, cfg["vision"])
+        dec = decision_previa if decision_previa is not None else decidir(desc, dicho, cfg["jev"])
+        return desc, dec
+
+    def uno(nombre):
         path = os.path.join(carpeta, nombre)
-        log("estado", f"Analizando {i}/{len(archivos)}: {nombre}")
+        tmp = tempfile.mkdtemp(prefix="reel_studio_")
         try:
             if nombre.lower().endswith(FOTO_EXT):
                 foto, dur, habla, ventanas = True, 4.0, [], [(0.0, 4.0)]
-                img = foto_compatible(path)
+                imgs = [foto_compatible(path)]
             else:
                 foto, dur = False, duracion(path)
-                habla = transcribir(path, cfg["whisper"])
+                with whisper_lock:  # un solo Whisper a la vez (CPU); mientras, los demás siguen con la visión
+                    habla = transcribir(path, cfg["whisper"])
                 ventanas = [(round(t, 2), round(min(cfg["paso"], dur - t), 2))
                             for t in frange(0, dur, cfg["paso"]) if dur - t >= 1.0]
-            tomas = []
-            for ini, d in ventanas:
-                img = img if foto else fotograma(path, ini + d / 2, tmp)
-                desc = describir(img, cfg["vision"])
+                imgs = [fotograma(path, ini + d / 2, os.path.join(tmp, f"f_{k:04d}.jpg")) for k, (ini, d) in enumerate(ventanas)]
+            # decidir qué fotogramas necesitan la visión y cuáles repiten al anterior
+            plan, ultima_huella, ref = [], None, None
+            for k, ((ini, d), img) in enumerate(zip(ventanas, imgs)):
                 dicho = " ".join(h["texto"] for h in habla if h["fin"] > ini and h["ini"] < ini + d)
-                tomas.append({"inicio": ini, "dur": d, "descripcion": desc, **decidir(desc, dicho, cfg["jev"])})
-            datos[nombre] = {"archivo": nombre, "foto": foto, "dur": round(dur, 2), "habla": habla, "tomas": tomas,
-                             "modelos": {k: cfg[k] for k in ("vision", "jev", "whisper")}}
-            json.dump(datos, open(salida, "w", encoding="utf-8"), ensure_ascii=False, indent=1)  # guarda en cada paso
-            log("fila", datos[nombre])
-        except Exception as e:
-            log("error", f"{nombre}: {e}")
-    log("progreso", (len(archivos), len(archivos)))
-    return datos
+                h = huella(img) if saltar else None
+                repetido = saltar and ref is not None and parecidos(h, ultima_huella, umbral)
+                if not repetido:
+                    ref, ultima_huella = k, h
+                plan.append((ini, d, img, dicho, ref if repetido else None))
+            # primero las tomas nuevas (en paralelo), luego las repetidas copian la descripción
+            futuros = {k: llamadas.submit(ventana, img, None, dicho, None)
+                       for k, (ini, d, img, dicho, rep) in enumerate(plan) if rep is None}
+            res = {k: f.result() for k, f in futuros.items()}
+            for k, (ini, d, img, dicho, rep) in enumerate(plan):
+                if rep is not None:
+                    desc, dec = res[rep]
+                    mismo_dicho = dicho == plan[rep][3]
+                    res[k] = (desc, dec) if mismo_dicho else llamadas.submit(ventana, img, desc, dicho, None).result()
+                    with guardar_lock:
+                        ahorradas[0] += 1
+            tomas = []
+            for k, (ini, d, img, dicho, rep) in enumerate(plan):
+                desc, dec = res[k]
+                tomas.append({"inicio": ini, "dur": d, "descripcion": desc, **dec,
+                              **({"repetida": True} if rep is not None else {})})
+            return {"archivo": nombre, "foto": foto, "dur": round(dur, 2), "habla": habla, "tomas": tomas,
+                    "modelos": {k: cfg[k] for k in ("vision", "jev", "whisper")}}
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
 
+    try:
+        with ThreadPoolExecutor(n) as archivos_pool:
+            futuros = {archivos_pool.submit(uno, nombre): nombre for nombre in pendientes}
+            for f in as_completed(futuros):
+                nombre = futuros[f]
+                try:
+                    fila = f.result()
+                    with guardar_lock:
+                        datos[nombre] = fila
+                        tmpjson = salida + ".tmp"
+                        json.dump(datos, open(tmpjson, "w", encoding="utf-8"), ensure_ascii=False, indent=1)
+                        os.replace(tmpjson, salida)  # guarda en cada archivo, sin dejarlo a medias
+                    log("fila", fila)
+                except Exception as e:
+                    log("error", f"{nombre}: {e}")
+                hechos[0] += 1
+                log("progreso", (hechos[0], len(pendientes)))
+                log("estado", f"Listo {nombre} ({hechos[0]}/{len(pendientes)})")
+    finally:
+        llamadas.shutdown(wait=False)
+    if ahorradas[0]:
+        log("estado", f"Se saltaron {ahorradas[0]} fotogramas repetidos (sin llamar a la visión)")
+    return datos
 
 def frange(a, b, s):
     while a < b:

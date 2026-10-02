@@ -20,7 +20,8 @@ CFG_FILE = os.path.join(BASE, "studio_config.json")
 
 CFG = {"carpeta": os.path.join(AQUI, "Videos Dropaudioccs"), "vision": "gemma3:4b", "jev": "nimble:latest",
        "escritor": "glm-5.3:cloud", "whisper": "small", "paso": 3.0, "minimo": 0.5, "drafts": core.CAPCUT_DRAFTS,
-       "vol_clips": 1.0, "vol_musica": 0.25, "musica": True, "nombre": "reel_auto_01", "rehacer": False}
+       "vol_clips": 1.0, "vol_musica": 0.25, "musica": True, "nombre": "reel_auto_01", "rehacer": False,
+       "simultaneos": 6, "saltar_repetidos": True}
 if os.path.exists(CFG_FILE):
     CFG.update(json.load(open(CFG_FILE, encoding="utf-8")))
 
