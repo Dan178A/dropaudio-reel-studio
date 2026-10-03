@@ -3,3 +3,5 @@ pillow
 pillow-heif
 numpy
 pywebview
+pymediainfo
+imageio

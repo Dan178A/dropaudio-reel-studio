@@ -145,7 +145,8 @@ def decidir(desc, habla, modelo):
 def escribir_guion(material, modelo, log=lambda *a: None, limite=600, formato="asi_compras"):
     """Pide el guion en streaming: se ve el avance (pensando / escribiendo) y nunca se queda colgado sin aviso.
     Desactiva el «razonamiento» largo de los modelos que piensan (think: false) si el modelo lo admite."""
-    body = {"model": modelo, "stream": True, "format": "json", "think": False, "options": {"num_ctx": 16384},
+    body = {"model": modelo, "stream": True, "format": ESQUEMA_GUION, "think": False,
+            "options": {"num_ctx": 16384, "num_predict": 3000, "temperature": 0.5},
             "messages": [{"role": "system", "content": prompt_formato(formato)}, {"role": "user", "content": material}]}
     inicio, ultimo, txt, pensado = time.time(), 0, [], 0
     for intento in (1, 2):
@@ -164,6 +165,8 @@ def escribir_guion(material, modelo, log=lambda *a: None, limite=600, formato="a
                     ahora = time.time()
                     if ahora - inicio > limite:
                         raise TimeoutError(f"{modelo} tardó más de {limite // 60} min")
+                    if sum(map(len, txt)) > 15000:  # un guion real ocupa 2-5 mil caracteres: se quedó en bucle
+                        raise RuntimeError("la respuesta se desbocó (más de 15 000 caracteres)")
                     if ahora - ultimo > 1:
                         ultimo, n = ahora, sum(map(len, txt))
                         seg = int(ahora - inicio)
@@ -177,9 +180,31 @@ def escribir_guion(material, modelo, log=lambda *a: None, limite=600, formato="a
             if intento == 1 and "think" in detalle.lower():  # el modelo no acepta think:false → sin esa opción
                 body.pop("think"); txt.clear(); continue
             raise RuntimeError(f"Ollama respondió {e.code}: {detalle[:200]}")
-    txt = "".join(txt)
-    txt = txt[txt.find("{"): txt.rfind("}") + 1]  # por si el modelo agrega texto alrededor
-    return json.loads(txt)
+    return leer_json("".join(txt))
+
+
+def leer_json(txt):
+    """JSON del modelo, tolerando texto alrededor y comas sobrantes."""
+    txt = txt[txt.find("{"): txt.rfind("}") + 1]
+    try:
+        return json.loads(txt)
+    except json.JSONDecodeError:
+        return json.loads(re.sub(r",\s*([}\]])", r"\1", txt))
+
+
+# Esquema que Ollama impone a la salida: evita JSON roto y respuestas que no terminan
+ESQUEMA_GUION = {
+    "type": "object", "required": ["gancho", "promesa", "clips", "narracion"],
+    "properties": {
+        "gancho": {"type": "string"}, "promesa": {"type": "string"},
+        "clips": {"type": "array", "maxItems": 14, "items": {
+            "type": "object", "required": ["archivo", "desde", "hasta", "paso"],
+            "properties": {"archivo": {"type": "string"}, "desde": {"type": "number"}, "hasta": {"type": "number"},
+                           "paso": {"type": "string", "enum": ["gancho", "1", "2", "3", "4", "5", "cta"]},
+                           "motivo": {"type": "string"}}}},
+        "narracion": {"type": "array", "maxItems": 10, "items": {
+            "type": "object", "required": ["clip", "en", "texto"],
+            "properties": {"clip": {"type": "integer"}, "en": {"type": "number"}, "texto": {"type": "string"}}}}}}
 
 
 # ---------------------------------------------------------------- medios
