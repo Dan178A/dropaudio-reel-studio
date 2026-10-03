@@ -21,13 +21,13 @@ CFG_FILE = os.path.join(BASE, "studio_config.json")
 CFG = {"carpeta": os.path.join(AQUI, "Videos Dropaudioccs"), "vision": "gemma3:4b", "jev": "nimble:latest",
        "escritor": "glm-5.3:cloud", "whisper": "small", "paso": 3.0, "minimo": 0.5, "drafts": core.CAPCUT_DRAFTS,
        "vol_clips": 1.0, "vol_musica": 0.25, "musica": True, "nombre": "reel_auto_01", "rehacer": False,
-       "simultaneos": 6, "saltar_repetidos": True, "formatos": list(core.ORDEN_FORMATOS), "max_por_formato": 2}
+       "simultaneos": 6, "saltar_repetidos": True, "formatos": list(core.ORDEN_FORMATOS), "max_por_formato": 2, "catalogo": []}
 if os.path.exists(CFG_FILE):
     CFG.update(json.load(open(CFG_FILE, encoding="utf-8")))
 
 LOCK = threading.Lock()
 JOB = {"tarea": None, "corriendo": False, "hecho": 0, "total": 0, "mensaje": "", "ok": None, "inicio": 0, "fin": 0}
-LOG, ESTADO = [], {"analisis_v": 0, "guion_v": 0, "modelos": [], "borrador": None}
+LOG, ESTADO = [], {"analisis_v": 0, "guion_v": 0, "etiq_v": 0, "modelos": [], "borrador": None}
 
 
 def guardar_cfg():
@@ -55,6 +55,14 @@ def evento(tipo, x):
 def leer(nombre):
     p = os.path.join(CFG["carpeta"], nombre)
     return json.load(open(p, encoding="utf-8")) if os.path.exists(p) else None
+
+
+def lista_archivos():
+    c = CFG["carpeta"]
+    if not os.path.isdir(c):
+        return []
+    return [{"archivo": f, "foto": f.lower().endswith(core.FOTO_EXT)} for f in sorted(os.listdir(c))
+            if f.lower().endswith(core.VIDEO_EXT + core.FOTO_EXT)]
 
 
 def archivos():
@@ -138,6 +146,36 @@ def miniatura(nombre, t):
     return dest if os.path.exists(dest) else None
 
 
+# ------------------------------------------------------------------ reproductor
+TIPOS_MIME = {".mp4": "video/mp4", ".m4v": "video/mp4", ".mov": "video/quicktime", ".mkv": "video/x-matroska",
+              ".avi": "video/x-msvideo", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png",
+              ".webp": "image/webp"}
+_proxy_lock = threading.Lock()
+
+
+def archivo_media(nombre, proxy=False):
+    """Ruta servible del archivo. Fotos HEIC -> JPG. Con proxy=True crea (una vez) una copia H.264 liviana
+    para videos que el visor no reproduce (p. ej. HEVC del iPhone)."""
+    nombre = os.path.basename(nombre)
+    src = os.path.join(CFG["carpeta"], nombre)
+    if not os.path.exists(src):
+        return None
+    if nombre.lower().endswith(core.FOTO_EXT):
+        return core.foto_compatible(src)
+    if not proxy:
+        return src
+    cache = os.path.join(CFG["carpeta"], "_reel_studio", "preview"); os.makedirs(cache, exist_ok=True)
+    dest = os.path.join(cache, os.path.splitext(nombre)[0] + ".mp4")
+    with _proxy_lock:
+        if not os.path.exists(dest):
+            tmp = dest + ".tmp.mp4"
+            core.run(["ffmpeg", "-v", "error", "-y", "-i", src, "-vf", "scale=-2:720", "-c:v", "libx264",
+                      "-preset", "veryfast", "-crf", "28", "-c:a", "aac", "-b:a", "96k", "-movflags", "+faststart", tmp])
+            if os.path.exists(tmp):
+                os.replace(tmp, dest)
+    return dest if os.path.exists(dest) else None
+
+
 def elegir_carpeta():
     """Diálogo nativo de Windows para elegir carpeta (proceso aparte para no chocar con el servidor)."""
     code = ("import tkinter as tk; from tkinter import filedialog; r=tk.Tk(); r.withdraw(); "
@@ -164,14 +202,19 @@ class H(BaseHTTPRequestHandler):
             self.send_response(200); self.send_header("Content-Type", "text/html; charset=utf-8")
             self.send_header("Cache-Control", "no-store"); self.end_headers(); self.wfile.write(b)
         elif u.path == "/api/estado":
-            v = int(q.get("av", ["-1"])[0]); gv = int(q.get("gv", ["-1"])[0])
+            v = int(q.get("av", ["-1"])[0]); gv = int(q.get("gv", ["-1"])[0]); ev = int(q.get("ev", ["-1"])[0])
             with LOCK:
                 job = dict(JOB); log = LOG[-120:]
             out = {"cfg": CFG, "archivos": archivos(), "modelos": ESTADO["modelos"], "job": job, "log": log,
                    "borrador": ESTADO["borrador"], "analisis_v": ESTADO["analisis_v"], "guion_v": ESTADO["guion_v"],
+                   "etiq_v": ESTADO["etiq_v"],
                    "ahora": time.time()}
             if v != ESTADO["analisis_v"]:
-                out["analisis"] = leer("analisis.json")
+                a = leer("analisis.json")
+                out["analisis"] = core.aplicar_etiquetas(a, core.leer_etiquetas(CFG["carpeta"]), CFG["catalogo"]) if a else a
+            if ev != ESTADO["etiq_v"]:
+                out["etiquetas"] = core.leer_etiquetas(CFG["carpeta"]) if os.path.isdir(CFG["carpeta"]) else {}
+                out["lista"] = lista_archivos()
             if gv != ESTADO["guion_v"]:
                 out["guion"] = core.leer_serie(CFG["carpeta"], CFG.get("nombre", "reel_auto_01"))
             if q.get("fmt"):
@@ -179,6 +222,35 @@ class H(BaseHTTPRequestHandler):
                                        "nucleo": f["nucleo"]} for k, f in core.FORMATOS.items()}
                 out["orden_formatos"] = core.ORDEN_FORMATOS
             self._json(out)
+        elif u.path == "/media":  # video/foto para el reproductor, con soporte de Range (para adelantar)
+            p = archivo_media(q.get("f", [""])[0], q.get("proxy", ["0"])[0] == "1")
+            if not p:
+                self.send_response(404); self.end_headers(); return
+            tam = os.path.getsize(p); ini, fin = 0, tam - 1
+            rng = self.headers.get("Range", "")
+            if rng.startswith("bytes="):
+                a, _, b = rng[6:].split(",")[0].partition("-")
+                if a:
+                    ini, fin = int(a), (int(b) if b else tam - 1)
+                else:
+                    ini = max(0, tam - int(b))
+                fin = min(fin, tam - 1)
+            self.send_response(206 if rng else 200)
+            self.send_header("Content-Type", TIPOS_MIME.get(os.path.splitext(p)[1].lower(), "application/octet-stream"))
+            self.send_header("Accept-Ranges", "bytes"); self.send_header("Content-Length", str(fin - ini + 1))
+            if rng:
+                self.send_header("Content-Range", f"bytes {ini}-{fin}/{tam}")
+            self.end_headers()
+            try:
+                with open(p, "rb") as f:
+                    f.seek(ini); falta = fin - ini + 1
+                    while falta > 0:
+                        trozo = f.read(min(1 << 20, falta))
+                        if not trozo:
+                            break
+                        self.wfile.write(trozo); falta -= len(trozo)
+            except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError):
+                pass  # el visor cortó la descarga al adelantar: normal
         elif u.path == "/thumb":
             p = miniatura(q.get("f", [""])[0], float(q.get("t", ["0"])[0]))
             if not p:
@@ -197,24 +269,54 @@ class H(BaseHTTPRequestHandler):
                 cambio_carpeta = nuevo.get("carpeta") and nuevo["carpeta"] != CFG["carpeta"]
                 CFG.update({k: v for k, v in nuevo.items() if k in CFG}); guardar_cfg()
                 if cambio_carpeta:
-                    ESTADO["analisis_v"] += 1; ESTADO["guion_v"] += 1; ESTADO["borrador"] = None
+                    ESTADO["analisis_v"] += 1; ESTADO["guion_v"] += 1; ESTADO["etiq_v"] += 1; ESTADO["borrador"] = None
                 self._json({"ok": True})
             elif u.path == "/api/usar_carpeta":
                 c = self._body().get("carpeta", "")
                 if c and os.path.isdir(c):
                     CFG["carpeta"] = c; guardar_cfg()
-                    ESTADO["analisis_v"] += 1; ESTADO["guion_v"] += 1; ESTADO["borrador"] = None
+                    ESTADO["analisis_v"] += 1; ESTADO["guion_v"] += 1; ESTADO["etiq_v"] += 1; ESTADO["borrador"] = None
                 self._json({"carpeta": CFG["carpeta"]})
             elif u.path == "/api/elegir_carpeta":
                 c = elegir_carpeta()
                 if c:
                     CFG["carpeta"] = c; guardar_cfg()
-                    ESTADO["analisis_v"] += 1; ESTADO["guion_v"] += 1; ESTADO["borrador"] = None
+                    ESTADO["analisis_v"] += 1; ESTADO["guion_v"] += 1; ESTADO["etiq_v"] += 1; ESTADO["borrador"] = None
                 self._json({"carpeta": CFG["carpeta"]})
             elif u.path.startswith("/api/tarea/"):
                 nombre = u.path.rsplit("/", 1)[1]
                 ok = nombre in TAREAS and lanzar(nombre, TAREAS[nombre])
                 self._json({"ok": ok}, 200 if ok else 409)
+            elif u.path == "/api/etiquetas":  # {"archivos": [...], "cambios": {"tipo"|"producto"|"nota": valor}}
+                b = self._body(); etiq = core.leer_etiquetas(CFG["carpeta"])
+                cambios = {k: (v or "").strip() for k, v in b.get("cambios", {}).items() if k in ("tipo", "producto", "nota")}
+                if isinstance(b.get("cambios", {}).get("marcas"), list):  # [{"t": 12.3, "texto": "..."}]
+                    cambios["marcas"] = sorted(({"t": round(float(m.get("t", 0)), 1), "texto": str(m.get("texto", "")).strip()}
+                                                for m in b["cambios"]["marcas"] if str(m.get("texto", "")).strip()),
+                                               key=lambda m: m["t"])
+                nombres = {x["archivo"] for x in lista_archivos()}
+                for a in b.get("archivos", []):
+                    if a in nombres:
+                        etiq[a] = {**etiq.get(a, {}), **cambios}
+                prod = cambios.get("producto")
+                if prod and not any(p["nombre"].lower() == prod.lower() for p in CFG["catalogo"]):
+                    CFG["catalogo"].append({"nombre": prod, "precio": None}); guardar_cfg()
+                etiq = core.guardar_etiquetas(CFG["carpeta"], etiq)
+                ESTADO["etiq_v"] += 1; ESTADO["analisis_v"] += 1
+                self._json({"ok": True, "etiquetas": etiq})
+            elif u.path == "/api/catalogo":  # [{"nombre": "KZ Castor", "precio": 25}]
+                cat = []
+                for p in self._body().get("catalogo", []):
+                    n = (p.get("nombre") or "").strip()
+                    if n and not any(c["nombre"].lower() == n.lower() for c in cat):
+                        try:
+                            pr = float(p["precio"]) if p.get("precio") not in (None, "") else None
+                        except (TypeError, ValueError):
+                            pr = None
+                        cat.append({"nombre": n, "precio": pr})
+                CFG["catalogo"] = cat; guardar_cfg()
+                ESTADO["etiq_v"] += 1; ESTADO["analisis_v"] += 1
+                self._json({"ok": True, "catalogo": cat})
             elif u.path == "/api/guion":  # recibe la serie completa {"videos": [...]}
                 serie = self._body()
                 datos = leer("analisis.json") or {}

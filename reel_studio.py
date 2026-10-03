@@ -31,6 +31,8 @@ TIPOS = {
     "persona": "Una persona hablando a cámara",
     "otro": "Nada de lo anterior o no se distingue",
 }
+TIPOS_CORTO = {"producto_detalle": "producto de cerca", "unboxing": "unboxing", "prueba_sonido": "prueba de sonido",
+               "entrega_moto": "entrega en moto", "pago": "pago", "persona": "persona a cámara", "otro": "otro"}
 PASOS = {"1": "Elige tu modelo", "2": "Escríbenos", "3": "Vamos a ti", "4": "Lo pruebas ahí mismo",
          "5": "Y solo entonces, pagas"}
 CTA = "Revisas. Escuchas. Luego pagas."
@@ -49,6 +51,8 @@ Reglas:
 - Narración: frases cortas (máx. 12 palabras), tono cercano venezolano, solo sobre clips SIN habla.
   'en' es el segundo dentro del clip. No nombres clientes ni des teléfonos de clientes.
 - Prefiere tomas con usable (u) alto e interés (i) alto.
+- Productos y precios: usa SOLO los que trae el material («producto: … ($…)»). No inventes modelos ni precios;
+  si un archivo no dice producto, no le pongas nombre ni precio.
 Responde SOLO con JSON:
 {{"gancho": "...", "promesa": "frase corta bajo el gancho",
  "clips": [{{"archivo": "...", "desde": 0.0, "hasta": 0.0, "paso": "gancho|1|2|3|4|5|cta", "motivo": "..."}}],
@@ -59,7 +63,8 @@ Responde SOLO con JSON:
 # «reglas»: qué tipos buscar en cada paso cuando no hay modelo de texto (o si falla).
 FORMATOS = {
     "unboxing": {
-        "titulo": "Unboxing", "kicker": "UNBOXING", "gancho_ej": "¿Original o réplica? Ábrelo conmigo",
+        "titulo": "Unboxing", "kicker": "UNBOXING", "por_producto": True, "gancho_ej": "¿Original o réplica? Ábrelo conmigo",
+        "gancho_prod": "{p}: ¿original o réplica?",
         "promesa": "Sellado de fábrica ↓",
         "pasos": {"1": "Sellado de fábrica", "2": "Lo abrimos", "3": "Qué trae", "4": "De cerca", "5": "Precio"},
         "estructura": "gancho -> 1 caja sellada -> 2 abriendo -> 3 qué trae (accesorios, cables) -> 4 detalle "
@@ -69,7 +74,8 @@ FORMATOS = {
                    ("3", ["unboxing", "producto_detalle"]), ("4", ["producto_detalle"]),
                    ("cta", ["producto_detalle", "persona"])]},
     "review": {
-        "titulo": "Review", "kicker": "REVIEW", "gancho_ej": "¿Unos KZ de $25 suenan bien?",
+        "titulo": "Review", "kicker": "REVIEW", "por_producto": True, "gancho_ej": "¿Unos KZ económicos suenan bien?",
+        "gancho_prod": "¿Los {p} suenan bien?",
         "promesa": "Te lo pruebo aquí ↓",
         "pasos": {"1": "Qué es", "2": "Lo conectamos", "3": "Cómo suena", "4": "Detalles", "5": "¿Vale la pena?"},
         "estructura": "gancho -> 1 qué es y para quién -> 2 conectarlo -> 3 prueba de sonido y reacción -> "
@@ -121,11 +127,11 @@ def modelos():
     return out
 
 
-def describir(img, modelo):
+def describir(img, modelo, pista=""):
     with open(img, "rb") as f:
         b64 = base64.b64encode(f.read()).decode()
     p = ("Describe en 2 frases, en español, qué se ve en esta imagen de una tienda de audífonos que entrega en moto: "
-         "objetos, acciones, personas, y si está borrosa, oscura o movida.")
+         "objetos, acciones, personas, y si está borrosa, oscura o movida." + (f" Dato del dueño: {pista}." if pista else ""))
     return ollama("/api/generate", {"model": modelo, "prompt": p, "images": [b64], "stream": False})["response"].strip()
 
 
@@ -265,6 +271,67 @@ def parecidos(a, b, umbral):
     return a is not None and b is not None and sum(abs(x - y) for x, y in zip(a, b)) / len(a) < umbral
 
 
+# ---------------------------------------------------------------- etiquetas del dueño
+def leer_etiquetas(carpeta):
+    """etiquetas.json: {archivo: {"tipo": "...", "producto": "...", "nota": "..."}} puesto a mano antes o después
+    de analizar. El tipo manda sobre lo que decida Jev y el producto evita mezclar modelos y precios."""
+    p = os.path.join(carpeta, "etiquetas.json")
+    return json.load(open(p, encoding="utf-8")) if os.path.exists(p) else {}
+
+
+def guardar_etiquetas(carpeta, etiq):
+    etiq = {k: {c: v for c, v in e.items() if v not in ("", None, [])} for k, e in etiq.items()}
+    etiq = {k: e for k, e in etiq.items() if e}
+    tmp = os.path.join(carpeta, "etiquetas.json.tmp")
+    json.dump(etiq, open(tmp, "w", encoding="utf-8"), ensure_ascii=False, indent=1)
+    os.replace(tmp, os.path.join(carpeta, "etiquetas.json"))
+    return etiq
+
+
+def precio_de(producto, catalogo):
+    for p in catalogo or []:
+        if p.get("nombre", "").strip().lower() == (producto or "").strip().lower():
+            return p.get("precio")
+    return None
+
+
+def pista_de(e, catalogo):
+    """Texto corto para la visión y el guion: «KZ Castor ($25) · entrega en moto · nota»."""
+    if not e:
+        return ""
+    partes = []
+    if e.get("producto"):
+        pr = precio_de(e["producto"], catalogo)
+        partes.append(f"el producto es {e['producto']}" + (f" (${pr:g})" if isinstance(pr, (int, float)) else ""))
+    if e.get("tipo"):
+        partes.append(f"es una toma de {TIPOS_CORTO.get(e['tipo'], e['tipo'])}")
+    if e.get("nota"):
+        partes.append(e["nota"])
+    return "; ".join(partes)
+
+
+def aplicar_etiquetas(datos, etiq, catalogo=None):
+    """Copia del análisis con lo que dijo el dueño: tipo fijo en todas las tomas y producto/precio por archivo.
+    Se aplica al usarlo, así una etiqueta puesta después del análisis también vale sin reanalizar."""
+    out = {}
+    for k, d in datos.items():
+        e = etiq.get(k) or {}
+        if not e:
+            out[k] = d; continue
+        d = dict(d)
+        if e.get("tipo") in TIPOS:
+            d["tomas"] = [dict(t, tipo=e["tipo"], tipo_fijo=True) for t in d["tomas"]]
+        if e.get("producto"):
+            d["producto"] = e["producto"].strip()
+            d["precio"] = precio_de(d["producto"], catalogo)
+        if e.get("nota"):
+            d["nota"] = e["nota"]
+        if e.get("marcas"):
+            d["marcas"] = e["marcas"]
+        out[k] = d
+    return out
+
+
 def analizar(carpeta, cfg, log, rehacer=False):
     """Analiza en paralelo: varios archivos a la vez, Whisper en su propio turno y un solo ffmpeg por video.
     Con «saltar_repetidos», un fotograma casi igual al anterior reutiliza la descripción en vez de llamar a la visión."""
@@ -288,14 +355,19 @@ def analizar(carpeta, cfg, log, rehacer=False):
     log("estado", f"Analizando {len(pendientes)} archivos nuevos, {n} a la vez"
                   + (f" ({len(archivos) - len(pendientes)} ya estaban)" if len(pendientes) < len(archivos) else ""))
     llamadas = ThreadPoolExecutor(n)  # tope de llamadas simultáneas a Ollama (visión + Jev)
+    etiq, catalogo = leer_etiquetas(carpeta), cfg.get("catalogo", [])
 
-    def ventana(img, desc_previa, dicho, decision_previa):
-        desc = desc_previa if desc_previa is not None else describir(img, cfg["vision"])
+    def ventana(img, desc_previa, dicho, decision_previa, pista="", tipo_fijo=None):
+        desc = desc_previa if desc_previa is not None else describir(img, cfg["vision"], pista)
         dec = decision_previa if decision_previa is not None else decidir(desc, dicho, cfg["jev"])
+        if tipo_fijo:
+            dec = dict(dec, tipo=tipo_fijo)
         return desc, dec
 
     def uno(nombre):
         path = os.path.join(carpeta, nombre)
+        e = etiq.get(nombre) or {}
+        pista, tipo_fijo = pista_de(e, catalogo), (e.get("tipo") if e.get("tipo") in TIPOS else None)
         tmp = tempfile.mkdtemp(prefix="reel_studio_")
         try:
             if nombre.lower().endswith(FOTO_EXT):
@@ -318,14 +390,17 @@ def analizar(carpeta, cfg, log, rehacer=False):
                     ref, ultima_huella = k, h
                 plan.append((ini, d, img, dicho, ref if repetido else None))
             # primero las tomas nuevas (en paralelo), luego las repetidas copian la descripción
-            futuros = {k: llamadas.submit(ventana, img, None, dicho, None)
+            def pista_v(ini, d):  # nota general + marcas del dueño que caen en esta ventana
+                ms = [m["texto"] for m in e.get("marcas", []) if ini - 1 <= m["t"] <= ini + d + 1]
+                return "; ".join([x for x in [pista] + ms if x])
+            futuros = {k: llamadas.submit(ventana, img, None, dicho, None, pista_v(ini, d), tipo_fijo)
                        for k, (ini, d, img, dicho, rep) in enumerate(plan) if rep is None}
             res = {k: f.result() for k, f in futuros.items()}
             for k, (ini, d, img, dicho, rep) in enumerate(plan):
                 if rep is not None:
                     desc, dec = res[rep]
                     mismo_dicho = dicho == plan[rep][3]
-                    res[k] = (desc, dec) if mismo_dicho else llamadas.submit(ventana, img, desc, dicho, None).result()
+                    res[k] = (desc, dec) if mismo_dicho else llamadas.submit(ventana, img, desc, dicho, None, pista_v(ini, d), tipo_fijo).result()
                     with guardar_lock:
                         ahorradas[0] += 1
             tomas = []
@@ -379,7 +454,11 @@ def material_para_llm(datos, minimo, por_archivo=4, largo=170):
             continue
         buenas = sorted(sorted(buenas, key=lambda t: t["usable"] * t["interes"], reverse=True)[:por_archivo],
                         key=lambda t: t["inicio"])
-        lineas.append(f"\n## {d['archivo']} ({'foto' if d['foto'] else 'video'}, {d['dur']} s)")
+        prod = ""
+        if d.get("producto"):
+            prod = f" · producto: {d['producto']}" + (f" (${d['precio']:g})" if isinstance(d.get("precio"), (int, float)) else "")
+        lineas.append(f"\n## {d['archivo']} ({'foto' if d['foto'] else 'video'}, {d['dur']} s){prod}"
+                      + (f" · nota del dueño: {d['nota']}" if d.get("nota") else ""))
         for t in buenas:
             desc = " ".join(t["descripcion"].split())
             desc = desc if len(desc) <= largo else desc[:largo].rsplit(" ", 1)[0] + "…"
@@ -387,6 +466,8 @@ def material_para_llm(datos, minimo, por_archivo=4, largo=170):
                           f"i={t['interes']:.2f}: {desc}")
         for h in d["habla"]:
             lineas.append(f"  habla {h['ini']}-{h['fin']}s: \"{h['texto']}\"")
+        for m in d.get("marcas", []):
+            lineas.append(f"  marca del dueño en {m['t']}s: {m['texto']}")
     return "Material disponible:" + "\n".join(lineas)
 
 
@@ -464,7 +545,8 @@ def guion_por_reglas(datos, minimo, formato="asi_compras"):
 
 def planear_serie(datos, minimo, formatos, max_por=2):
     """Reparte los ARCHIVOS entre varios reels: cada archivo va a un solo reel (no se repite material).
-    Cada archivo cuenta como el tipo de toma que más pesa en él. Devuelve (planes, avisos)."""
+    Cada archivo cuenta como el tipo de toma que más pesa en él (o el que le puso el dueño).
+    Unboxing y Review son de UN producto: no mezclan modelos ni precios. Devuelve (planes, avisos)."""
     info = []
     for d in datos.values():
         buenas = [t for t in d["tomas"] if t["usable"] >= minimo]
@@ -474,9 +556,28 @@ def planear_serie(datos, minimo, formatos, max_por=2):
         for t in buenas:
             peso[t["tipo"]] = peso.get(t["tipo"], 0) + t["usable"] * (0.5 + t["interes"]) * t["dur"]
         tipo = max(peso, key=peso.get)
-        info.append({"archivo": d["archivo"], "tipo": tipo, "peso": peso[tipo], "seg": sum(t["dur"] for t in buenas)})
+        info.append({"archivo": d["archivo"], "tipo": tipo, "peso": peso[tipo], "producto": d.get("producto"),
+                     "seg": sum(t["dur"] for t in buenas)})
     info.sort(key=lambda x: x["peso"], reverse=True)
     usados, planes, avisos, cuenta = set(), [], [], {}
+
+    def armar_plan(fk, f, nucleo, apoyo, producto):
+        elegidos, seg = [], 0.0
+        for x in nucleo:  # el corazón del reel
+            if seg >= 20 or len(elegidos) >= 5:
+                break
+            elegidos.append(x); seg += x["seg"]
+        for x in apoyo:  # lo completa hasta tener material de sobra
+            if seg >= 50 or len(elegidos) >= 9:
+                break
+            elegidos.append(x); seg += x["seg"]
+        if seg < 20:
+            return None, seg
+        usados.update(x["archivo"] for x in elegidos)
+        cuenta[fk] = cuenta.get(fk, 0) + 1
+        return {"formato": fk, "n": cuenta[fk], "producto": producto, "archivos": [x["archivo"] for x in elegidos],
+                "segundos_material": round(seg, 1)}, seg
+
     for ronda in range(max_por):
         for fk in formatos:
             f = FORMATOS.get(fk)
@@ -486,26 +587,28 @@ def planear_serie(datos, minimo, formatos, max_por=2):
             nucleo = [x for x in libres if x["tipo"] in f["nucleo"]]
             if not nucleo:
                 if ronda == 0:
-                    avisos.append(f"{f['titulo']}: no hay tomas de {' / '.join(TIPOS[t].lower() for t in f['nucleo'])}. "
-                                  "Graba ese tipo de toma para este formato.")
+                    avisos.append(f"{f['titulo']}: no hay tomas de {' / '.join(TIPOS_CORTO[t] for t in f['nucleo'])}. "
+                                  "Graba ese tipo de toma o etiqueta un archivo con ese tipo.")
                 continue
-            elegidos, seg = [], 0.0
-            for x in nucleo:  # el corazón del reel
-                if seg >= 20 or len(elegidos) >= 5:
-                    break
-                elegidos.append(x); seg += x["seg"]
-            for x in (x for x in libres if x["tipo"] in f["apoyo"]):  # lo completa hasta tener material de sobra
-                if seg >= 50 or len(elegidos) >= 9:
-                    break
-                elegidos.append(x); seg += x["seg"]
-            if seg < 20:
-                if ronda == 0:
+            if f.get("por_producto"):
+                # un reel por producto; los archivos sin producto se juntan solo entre ellos
+                for prod in dict.fromkeys(x["producto"] for x in nucleo):
+                    nuc = [x for x in nucleo if x["producto"] == prod and x["archivo"] not in usados]
+                    apo = [x for x in libres if x["tipo"] in f["apoyo"] and x["producto"] == prod
+                           and x["archivo"] not in usados and x not in nuc]
+                    plan, seg = armar_plan(fk, f, nuc, apo, prod)
+                    if plan:
+                        planes.append(plan)
+                    elif ronda == 0:
+                        avisos.append(f"{f['titulo']} {prod or '(sin producto)'}: solo hay {seg:.0f} s de tomas "
+                                      "buenas; hace falta más material de ese modelo.")
+            else:
+                apo = [x for x in libres if x["tipo"] in f["apoyo"]]
+                plan, seg = armar_plan(fk, f, nucleo, apo, None)
+                if plan:
+                    planes.append(plan)
+                elif ronda == 0:
                     avisos.append(f"{f['titulo']}: solo hay {seg:.0f} s de tomas buenas; hace falta más material.")
-                continue
-            usados.update(x["archivo"] for x in elegidos)
-            cuenta[fk] = cuenta.get(fk, 0) + 1
-            planes.append({"formato": fk, "n": cuenta[fk], "archivos": [x["archivo"] for x in elegidos],
-                           "segundos_material": round(seg, 1)})
     return planes, avisos
 
 
@@ -513,6 +616,7 @@ def hacer_serie(carpeta, cfg, log):
     """Paso 2 en modo serie: varios reels separados por formato, cada uno con su guion y su material."""
     from concurrent.futures import ThreadPoolExecutor
     datos = json.load(open(os.path.join(carpeta, "analisis.json"), encoding="utf-8"))
+    datos = aplicar_etiquetas(datos, leer_etiquetas(carpeta), cfg.get("catalogo", []))
     formatos = [f for f in cfg.get("formatos", ORDEN_FORMATOS) if f in FORMATOS] or ORDEN_FORMATOS
     planes, avisos = planear_serie(datos, cfg["minimo"], formatos, int(cfg.get("max_por_formato", 2)))
     for a in avisos:
@@ -520,24 +624,38 @@ def hacer_serie(carpeta, cfg, log):
     if not planes:
         raise RuntimeError("No alcanza el material para ningún reel. Revisa el mínimo «usable» o analiza más tomas.")
     prefijo = (cfg.get("nombre") or "reel").strip() or "reel"
-    log("estado", f"Escribiendo {len(planes)} reels: " + ", ".join(f"{FORMATOS[p['formato']]['titulo']} {p['n']}" for p in planes))
+    def titulo_de(p):
+        return f"{FORMATOS[p['formato']]['titulo']} · {p['producto']}" if p.get("producto") \
+            else f"{FORMATOS[p['formato']]['titulo']} {p['n']}"
+    log("estado", f"Escribiendo {len(planes)} reels: " + ", ".join(titulo_de(p) for p in planes))
     log("progreso", (0, len(planes)))
     hechos = [0]; lock = threading.Lock()
 
     def uno(plan):
         sub = {a: datos[a] for a in plan["archivos"]}
-        titulo = f"{FORMATOS[plan['formato']]['titulo']} {plan['n']}"
+        titulo = titulo_de(plan)
         if cfg["escritor"] == "(reglas, sin IA)":
             sel = guion_por_reglas(sub, cfg["minimo"], plan["formato"])
         else:
             try:
-                sel = escribir_guion(material_para_llm(sub, cfg["minimo"]), cfg["escritor"],
+                cab = ""
+                if plan.get("producto"):
+                    pr = precio_de(plan["producto"], cfg.get("catalogo", []))
+                    cab = (f"Este reel es SOLO del {plan['producto']}"
+                           + (f" (precio ${pr:g})" if isinstance(pr, (int, float)) else "") + ". No nombres otros modelos.\n")
+                sel = escribir_guion(cab + material_para_llm(sub, cfg["minimo"]), cfg["escritor"],
                                      lambda t, x: log(t, f"{titulo}: {x}"), formato=plan["formato"])
             except Exception as e:
                 log("error", f"{titulo}: el modelo falló ({e}). Uso reglas; puedes editarlo.")
                 sel = guion_por_reglas(sub, cfg["minimo"], plan["formato"])
-        sel["formato"], sel["titulo"] = plan["formato"], titulo
-        sel["nombre"] = f"{prefijo}_{plan['formato']}_{plan['n']:02d}"
+        sel["formato"], sel["titulo"], sel["producto"] = plan["formato"], titulo, plan.get("producto")
+        slug = re.sub(r"[^a-z0-9]+", "_", (plan.get("producto") or "").lower()).strip("_")
+        sel["nombre"] = f"{prefijo}_{plan['formato']}_{slug + '_' if slug else ''}{plan['n']:02d}"
+        prod, f = plan.get("producto"), FORMATOS[plan["formato"]]
+        if prod and not sel.get("gancho") and f.get("gancho_prod"):  # reglas: gancho y promesa con el modelo
+            sel["gancho"] = f["gancho_prod"].format(p=prod)
+            pr = precio_de(prod, cfg.get("catalogo", []))
+            sel.setdefault("promesa", f"{prod} · ${pr:g} ↓" if isinstance(pr, (int, float)) else f["promesa"])
         sel = validar(sel, datos, set(plan["archivos"]))
         if not sel["clips"]:  # el modelo devolvió algo inservible: reglas
             sel.update(validar(dict(guion_por_reglas(sub, cfg["minimo"], plan["formato"]), formato=plan["formato"]),

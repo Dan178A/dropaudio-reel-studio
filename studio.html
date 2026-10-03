@@ -173,6 +173,28 @@ summary::after{content:"＋";color:var(--gold)}details[open] summary::after{cont
 .reels .chip small{font-weight:500;opacity:.8}
 .reelbar{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;margin-bottom:16px;padding:14px;border:1px solid var(--line);border-radius:var(--r);background:var(--card)}
 .reelbar .field{margin:0;min-width:240px;flex:1}
+.etq-top{display:grid;grid-template-columns:1fr 1.3fr;gap:14px;margin-bottom:16px}
+@media (max-width:1100px){.etq-top{grid-template-columns:1fr}}
+.etq-box{border:1px solid var(--line);border-radius:var(--r);background:var(--card);padding:14px;display:grid;gap:10px;align-content:start}
+.etq-box h4{margin:0;font:700 15px/1.2 var(--f-title)}.etq-box h4 small{font:500 12px var(--f-text);color:var(--muted);margin-left:6px}
+.cat{display:grid;gap:6px}.catrow{display:grid;grid-template-columns:1fr 90px 34px;gap:6px;align-items:center}
+.grid.etq .toma .body{gap:6px}.grid.etq select{min-height:34px;padding:5px 30px 5px 9px;font-size:12.5px;background-position:calc(100% - 15px) 14px,calc(100% - 10px) 14px}
+.grid.etq .thumb{aspect-ratio:9/10;cursor:pointer}
+.pick{position:absolute;left:8px;top:8px;width:22px;height:22px;accent-color:var(--gold)}
+.toma.sel{border-color:var(--gold);box-shadow:0 0 0 1px var(--gold)}
+dialog#visor{width:min(1180px,96vw);max-height:94vh;padding:0;border:1px solid var(--line2);border-radius:18px;background:var(--panel);color:var(--bone)}
+dialog#visor::backdrop{background:rgba(0,0,0,.72)}
+.vhead{display:flex;align-items:center;gap:10px;padding:12px 16px;border-bottom:1px solid var(--line)}
+.vhead h3{margin:0;flex:1;font:700 15px/1.2 var(--f-title);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.vbody{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(300px,1fr);gap:16px;padding:16px;max-height:calc(94vh - 60px);overflow:auto}
+@media (max-width:900px){.vbody{grid-template-columns:1fr}}
+#vMedia{background:#000;border-radius:12px;display:grid;place-items:center;min-height:300px;max-height:76vh;overflow:hidden;position:relative}
+#vMedia video,#vMedia img{max-width:100%;max-height:76vh;display:block}
+.vmsg{position:absolute;bottom:10px;left:10px;right:10px;margin:0;background:rgba(9,8,7,.85);padding:8px 10px;border-radius:8px;font-size:13px}
+.vside{display:grid;gap:12px;align-content:start}
+#vMarcas{list-style:none;margin:0;padding:0;display:grid;gap:6px}
+#vMarcas li{display:grid;grid-template-columns:auto 1fr auto;gap:8px;align-items:center;font-size:13px}
+.marcar{display:grid;grid-template-columns:1fr auto;gap:8px}
 .avisos{border:1px solid var(--gold3);border-radius:var(--r2);padding:10px 14px;margin-bottom:14px;color:var(--gold2);font-size:13px}
 .avisos div+div{margin-top:4px}
 </style>
@@ -281,11 +303,13 @@ summary::after{content:"＋";color:var(--gold)}details[open] summary::after{cont
   <div id="doneBox"></div>
 
   <div class="tabs" role="tablist">
+    <button class="tab" role="tab" id="tab-e" aria-controls="pan-e" aria-selected="false">Etiquetar <span class="count" id="nE">0</span></button>
     <button class="tab" role="tab" id="tab-t" aria-controls="pan-t" aria-selected="true">Tomas <span class="count" id="nT">0</span></button>
     <button class="tab" role="tab" id="tab-g" aria-controls="pan-g" aria-selected="false">Guion <span class="count" id="nG">—</span></button>
     <button class="tab" role="tab" id="tab-l" aria-controls="pan-l" aria-selected="false">Registro</button>
   </div>
 
+  <section role="tabpanel" id="pan-e" aria-labelledby="tab-e" hidden></section>
   <section role="tabpanel" id="pan-t" aria-labelledby="tab-t">
     <div class="filters" id="filters" aria-label="Filtrar tomas"></div>
     <div class="grid" id="grid"></div>
@@ -294,6 +318,27 @@ summary::after{content:"＋";color:var(--gold)}details[open] summary::after{cont
   <section role="tabpanel" id="pan-l" aria-labelledby="tab-l" hidden><div class="log" id="log"></div></section>
 </main>
 </div>
+
+<dialog id="visor" aria-labelledby="vTit">
+  <div class="vhead">
+    <button class="iconbtn" id="vPrev" aria-label="Archivo anterior"><svg width="16" height="16" style="transform:rotate(-90deg)"><use href="#i-up"/></svg></button>
+    <button class="iconbtn" id="vNext" aria-label="Archivo siguiente"><svg width="16" height="16" style="transform:rotate(90deg)"><use href="#i-up"/></svg></button>
+    <h3 id="vTit"></h3>
+    <button class="iconbtn" id="vCerrar" aria-label="Cerrar"><svg width="16" height="16"><use href="#i-x"/></svg></button>
+  </div>
+  <div class="vbody">
+    <div id="vMedia"></div>
+    <div class="vside">
+      <div class="field"><label for="vTipo">Tipo de toma</label><select id="vTipo"></select></div>
+      <div class="field"><label for="vProd">Producto que sale</label><select id="vProd"></select></div>
+      <div class="field"><label for="vNota">Nota para la IA</label><input type="text" id="vNota" maxlength="160" placeholder="ej. cliente probando el Castor con el DAC AM02"></div>
+      <div class="field"><label for="vMarcaTxt">Marcas en el video</label>
+        <div class="marcar"><input type="text" id="vMarcaTxt" maxlength="120" placeholder="Qué pasa en este segundo"><button class="btn ghost sm" id="vMarcaBtn">Marcar aquí</button></div></div>
+      <ul id="vMarcas"></ul>
+      <p class="help">Se guarda solo. La IA usa el tipo, el producto, la nota y las marcas al analizar y al escribir el guion.</p>
+    </div>
+  </div>
+</dialog>
 
 <div class="toast" id="toast" role="status" aria-live="polite"><svg width="22" height="22" style="color:var(--gold);flex:none"><use href="#i-check"/></svg><p id="toastTxt"></p></div>
 
@@ -474,7 +519,8 @@ function renderTomas(){
         <span class="t">${d.foto ? "FOTO" : fmt(t.inicio)}</span>
         <span class="v ${buena?"si":"no"}"><svg width="11" height="11"><use href="#i-${buena?"check":"x"}"/></svg>${buena?"Sirve":"Descartada"}</span></div>
       <div class="body">
-        <div class="tipo">${esc(TIPOS[t.tipo] || t.tipo)}</div>
+        <div class="tipo">${esc(TIPOS[t.tipo] || t.tipo)}${t.tipo_fijo ? ' <small title="Lo marcaste tú">✎</small>' : ""}</div>
+        ${d.producto ? `<span class="pill" style="justify-self:start">${esc(d.producto)}${d.precio!=null?` · $${d.precio}`:""}</span>` : ""}
         <div class="fn" title="${esc(d.archivo)}">${esc(d.archivo)}</div>
         <div class="meter"><span>Usable</span><div class="bar"><i style="width:${t.usable*100}%"></i></div><span>${Math.round(t.usable*100)}</span></div>
         <div class="meter"><span>Engancha</span><div class="bar"><i style="width:${t.interes*100}%"></i></div><span>${Math.round(t.interes*100)}</span></div>
@@ -600,6 +646,158 @@ function guardar(ahora, borrado=false){
   }, ahora ? 50 : 700);
 }
 
+
+/* ---------- etiquetar (antes o después de analizar) ---------- */
+S.etiq = {}; S.lista = []; S.ev = -1; S.sel = new Set(); S.efil = "todos";
+function prodOpts(val, vacio="— Sin producto —"){
+  const cat = S.cfg.catalogo || [];
+  return `<option value="">${vacio}</option>` + cat.map(p => `<option value="${esc(p.nombre)}" ${p.nombre===val?"selected":""}>${esc(p.nombre)}${p.precio!=null?` · $${p.precio}`:""}</option>`).join("")
+    + (val && !cat.some(p=>p.nombre===val) ? `<option selected>${esc(val)}</option>` : "") + `<option value="__nuevo">+ Nuevo producto…</option>`;
+}
+function tipoOpts(val, vacio="Automático (la IA decide)"){
+  return `<option value="">${vacio}</option>` + Object.entries(TIPOS).map(([k,l]) => `<option value="${k}" ${k===val?"selected":""}>${l}</option>`).join("");
+}
+function renderEtiq(){
+  const p = $("#pan-e"), cat = S.cfg.catalogo || [], L = S.lista || [];
+  const conE = L.filter(f => S.etiq[f.archivo]).length;
+  $("#nE").textContent = `${conE}/${L.length}`;
+  const vis = L.filter(f => S.efil === "todos" || (S.efil === "sin" ? !S.etiq[f.archivo] : !!S.etiq[f.archivo]));
+  p.innerHTML = `
+    <div class="etq-top">
+      <div class="etq-box">
+        <h4>Tus productos <small>nombre y precio en $</small></h4>
+        <div class="cat">${cat.map((c,i)=>`<div class="catrow">
+          <input type="text" aria-label="Producto" data-cat="${i}" data-cf="nombre" value="${esc(c.nombre)}">
+          <input type="number" aria-label="Precio en dólares" min="0" step="0.5" data-cat="${i}" data-cf="precio" value="${c.precio ?? ""}" placeholder="$">
+          <button class="iconbtn" aria-label="Quitar ${esc(c.nombre)}" data-catdel="${i}"><svg width="14" height="14"><use href="#i-x"/></svg></button></div>`).join("") || `<p class="help">Agrega tus modelos (ej. KZ Castor · 25). Así la IA no mezcla modelos ni inventa precios.</p>`}</div>
+        <button class="btn ghost sm" id="catAdd"><svg width="14" height="14"><use href="#i-plus"/></svg>Producto</button>
+      </div>
+      <div class="etq-box">
+        <h4>Aplicar a <b id="nSel">${S.sel.size}</b> seleccionados</h4>
+        <div class="row2">
+          <div class="field"><label for="bTipo">Tipo de toma</label><select id="bTipo">${tipoOpts("", "— No cambiar —")}<option value="__auto">Automático (quitar)</option></select></div>
+          <div class="field"><label for="bProd">Producto</label><select id="bProd">${prodOpts("", "— No cambiar —").replace('<option value="__nuevo">','<option value="__quitar">Sin producto (quitar)</option><option value="__nuevo">')}</select></div>
+        </div>
+        <div class="field"><label for="bNota">Nota para la IA (opcional)</label><input type="text" id="bNota" placeholder="ej. cliente en Guarenas, prueba con el DAC AM02" maxlength="120"></div>
+        <button class="btn gold sm" id="bAplicar" ${S.sel.size?"":"disabled"}>Aplicar</button>
+      </div>
+    </div>
+    <div class="filters">
+      ${[["todos","Todos"],["sin","Sin etiqueta"],["con","Etiquetados"]].map(([k,l])=>`<button class="chip" data-ef="${k}" aria-pressed="${S.efil===k}">${l}</button>`).join("")}
+      <span class="sep" aria-hidden="true"></span>
+      <button class="chip" data-selall="1">Seleccionar visibles</button><button class="chip" data-selall="0">Ninguno</button>
+    </div>
+    ${!L.length ? `<div class="empty"><b>No hay videos ni fotos en la carpeta</b>Elige la carpeta en el panel izquierdo.</div>` : `
+    <div class="grid etq">${vis.map(f => { const e = S.etiq[f.archivo] || {}, on = S.sel.has(f.archivo);
+      return `<article class="toma ${on?"sel":""}">
+        <div class="thumb" data-play="${esc(f.archivo)}" title="Ver y anotar"><img loading="lazy" alt="" src="${thumb(f.archivo, f.foto ? 0 : 1)}">
+          <input type="checkbox" class="pick" data-pick="${esc(f.archivo)}" ${on?"checked":""} aria-label="Seleccionar ${esc(f.archivo)}">
+          <span class="t">${f.foto ? "FOTO" : "▶ VER"}</span>${(e.marcas||[]).length ? `<span class="v si">${e.marcas.length} marcas</span>` : ""}</div>
+        <div class="body">
+          <div class="fn" title="${esc(f.archivo)}">${esc(f.archivo)}</div>
+          <select aria-label="Tipo de ${esc(f.archivo)}" data-ea="${esc(f.archivo)}" data-ek="tipo">${tipoOpts(e.tipo || "")}</select>
+          <select aria-label="Producto de ${esc(f.archivo)}" data-ea="${esc(f.archivo)}" data-ek="producto">${prodOpts(e.producto || "")}</select>
+          ${e.nota ? `<div class="desc">Nota: ${esc(e.nota)}</div>` : ""}
+        </div></article>`; }).join("")}</div>`}`;
+}
+async function etiquetar(archivos, cambios){
+  if (cambios.producto === "__nuevo"){
+    const n = prompt("Nombre del producto (ej. KZ Castor Pro):"); if (!n) return renderEtiq();
+    const pr = prompt(`Precio de ${n} en $ (puedes dejarlo vacío):`);
+    S.cfg.catalogo = [...(S.cfg.catalogo||[]), {nombre:n.trim(), precio: pr ? parseFloat(pr) : null}];
+    await api("/api/catalogo", {catalogo: S.cfg.catalogo}); cambios.producto = n.trim();
+  }
+  const r = await api("/api/etiquetas", {archivos, cambios});
+  if (r.ok){ S.etiq = r.etiquetas; renderEtiq(); poll(); } else toast("No pude guardar la etiqueta: " + r.error, true);
+}
+let catT;
+function guardarCatalogo(){
+  clearTimeout(catT); S.catLocal = S.cfg.catalogo; S.catPend = true;   // que el sondeo no pise lo que escribes
+  catT = setTimeout(async () => {
+    await api("/api/catalogo", {catalogo: S.cfg.catalogo}); S.catPend = false;
+    // refrescar las listas de productos sin redibujar la pestaña (no perder el foco)
+    const bp = $("#bProd"); if (bp){ const v = bp.value; bp.innerHTML = prodOpts("", "— No cambiar —").replace('<option value="__nuevo">','<option value="__quitar">Sin producto (quitar)</option><option value="__nuevo">'); bp.value = v; }
+    document.querySelectorAll('#pan-e [data-ek="producto"]').forEach(sel => { sel.innerHTML = prodOpts(S.etiq[sel.dataset.ea]?.producto || ""); });
+  }, 400);
+}
+$("#pan-e").addEventListener("change", e => {
+  const t = e.target;
+  if (t.dataset.pick !== undefined){ t.checked ? S.sel.add(t.dataset.pick) : S.sel.delete(t.dataset.pick); t.closest(".toma").classList.toggle("sel", t.checked); $("#nSel").textContent = S.sel.size; $("#bAplicar").disabled = !S.sel.size; return; }
+  if (t.dataset.ea) return etiquetar([t.dataset.ea], {[t.dataset.ek]: t.value});
+  if (t.dataset.cat !== undefined){ const c = S.cfg.catalogo[+t.dataset.cat]; c[t.dataset.cf] = t.dataset.cf === "precio" ? (t.value === "" ? null : parseFloat(t.value)) : t.value; guardarCatalogo(); }
+});
+$("#pan-e").addEventListener("click", e => {
+  const b = e.target.closest("button"); if (!b) return;
+  if (b.id === "catAdd"){ S.cfg.catalogo = [...(S.cfg.catalogo||[]), {nombre:"", precio:null}]; S.catLocal = S.cfg.catalogo; S.catPend = true; renderEtiq(); $(`[data-cat="${S.cfg.catalogo.length-1}"]`)?.focus(); return; }
+  if (b.dataset.catdel){ S.cfg.catalogo.splice(+b.dataset.catdel, 1); renderEtiq(); guardarCatalogo(); return; }
+  if (b.dataset.ef){ S.efil = b.dataset.ef; renderEtiq(); return; }
+  if (b.dataset.selall){ const vis = [...document.querySelectorAll("#pan-e [data-pick]")].map(x => x.dataset.pick);
+    if (b.dataset.selall === "1") vis.forEach(a => S.sel.add(a)); else S.sel.clear(); renderEtiq(); return; }
+  if (b.id === "bAplicar"){
+    const c = {}, tp = $("#bTipo").value, pr = $("#bProd").value, nota = $("#bNota").value.trim();
+    if (tp) c.tipo = tp === "__auto" ? "" : tp;
+    if (pr) c.producto = pr === "__quitar" ? "" : pr;
+    if (nota) c.nota = nota;
+    if (!Object.keys(c).length){ toast("Elige un tipo, un producto o escribe una nota."); return; }
+    etiquetar([...S.sel], c).then(() => toast(`Etiqueta aplicada a ${S.sel.size} archivos.`));
+  }
+});
+
+
+/* ---------- reproductor con anotaciones ---------- */
+let PV = {i:-1, e:{}, proxy:false};
+const mmss = t => `${Math.floor(t/60)}:${String(Math.floor(t%60)).padStart(2,"0")}`;
+function abrirVisor(archivo){
+  PV.i = S.lista.findIndex(f => f.archivo === archivo); if (PV.i < 0) return;
+  pintarVisor(); const dlg = $("#visor"); if (!dlg.open) dlg.showModal();
+}
+function pintarVisor(){
+  const f = S.lista[PV.i], e = JSON.parse(JSON.stringify(S.etiq[f.archivo] || {}));
+  PV.e = e; PV.e.marcas = PV.e.marcas || []; PV.proxy = false;
+  $("#vTit").textContent = `${f.archivo}  ·  ${PV.i+1}/${S.lista.length}`;
+  $("#vMedia").innerHTML = f.foto
+    ? `<img src="/media?f=${encodeURIComponent(f.archivo)}" alt="${esc(f.archivo)}">`
+    : `<video id="vVid" src="/media?f=${encodeURIComponent(f.archivo)}" controls autoplay playsinline></video><p class="vmsg" id="vMsg" hidden></p>`;
+  const v = $("#vVid");
+  if (v) v.onerror = () => {               // HEVC u otro formato que el visor no lee: copia liviana
+    if (PV.proxy) { $("#vMsg").hidden = false; $("#vMsg").textContent = "No pude reproducir este video."; return; }
+    PV.proxy = true; $("#vMsg").hidden = false; $("#vMsg").textContent = "Preparando una copia para verlo aquí…";
+    v.src = `/media?f=${encodeURIComponent(f.archivo)}&proxy=1`; v.oncanplay = () => { $("#vMsg").hidden = true; };
+  };
+  $("#vTipo").innerHTML = tipoOpts(e.tipo || ""); $("#vProd").innerHTML = prodOpts(e.producto || "");
+  $("#vNota").value = e.nota || ""; $("#vMarcaTxt").value = ""; $("#vMarcaBtn").hidden = !!f.foto; $("#vMarcaTxt").hidden = !!f.foto;
+  pintarMarcas();
+  $("#vPrev").disabled = PV.i === 0; $("#vNext").disabled = PV.i === S.lista.length - 1;
+}
+function pintarMarcas(){
+  $("#vMarcas").innerHTML = PV.e.marcas.map((m,j) => `<li><button class="chip" data-seek="${m.t}">${mmss(m.t)}</button>
+    <span>${esc(m.texto)}</span><button class="iconbtn" aria-label="Quitar marca" data-mdel="${j}"><svg width="13" height="13"><use href="#i-x"/></svg></button></li>`).join("")
+    || `<li class="help">Pausa donde pase algo (ej. «aquí se ve el Castor Pro») y pulsa <b>Marcar aquí</b>.</li>`;
+}
+async function guardarVisor(){
+  const f = S.lista[PV.i];
+  await etiquetar([f.archivo], {tipo: $("#vTipo").value, producto: $("#vProd").value, nota: $("#vNota").value.trim(), marcas: PV.e.marcas});
+  if ($("#vProd").value === "__nuevo") pintarVisor();
+}
+$("#visor").addEventListener("change", e => { if (["vTipo","vProd","vNota"].includes(e.target.id)) guardarVisor(); });
+$("#visor").addEventListener("click", e => {
+  const b = e.target.closest("button"); if (!b) return;
+  const v = $("#vVid");
+  if (b.id === "vCerrar") { v?.pause(); $("#visor").close(); }
+  else if (b.id === "vPrev" || b.id === "vNext") { v?.pause(); PV.i += b.id === "vNext" ? 1 : -1; pintarVisor(); }
+  else if (b.id === "vMarcaBtn") {
+    const txt = $("#vMarcaTxt").value.trim(); if (!txt) { $("#vMarcaTxt").focus(); toast("Escribe qué pasa en ese momento."); return; }
+    PV.e.marcas.push({t: Math.round((v?.currentTime || 0)*10)/10, texto: txt}); PV.e.marcas.sort((a,b)=>a.t-b.t);
+    $("#vMarcaTxt").value = ""; pintarMarcas(); guardarVisor();
+  }
+  else if (b.dataset.seek && v) { v.currentTime = +b.dataset.seek; v.play(); }
+  else if (b.dataset.mdel) { PV.e.marcas.splice(+b.dataset.mdel, 1); pintarMarcas(); guardarVisor(); }
+});
+$("#vMarcaTxt").addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); $("#vMarcaBtn").click(); } });
+$("#vMarcaTxt").addEventListener("focus", () => $("#vVid")?.pause());
+$("#visor").addEventListener("close", () => $("#vVid")?.pause());
+$("#pan-e").addEventListener("click", e => { const t = e.target.closest("[data-play]"); if (t && !e.target.closest(".pick")) abrirVisor(t.dataset.play); });
+
 /* ---------- log, tabs, toast ---------- */
 function renderLog(log){
   const el = $("#log"), abajo = el.scrollTop + el.clientHeight >= el.scrollHeight - 30;
@@ -607,12 +805,12 @@ function renderLog(log){
   if (abajo) el.scrollTop = el.scrollHeight;
 }
 function selectTab(k){
-  for (const x of ["t","g","l"]){ $("#tab-"+x).setAttribute("aria-selected", x===k); $("#pan-"+x).hidden = x!==k; }
+  for (const x of ["e","t","g","l"]){ $("#tab-"+x).setAttribute("aria-selected", x===k); $("#pan-"+x).hidden = x!==k; }
 }
-for (const x of ["t","g","l"]) $("#tab-"+x).onclick = () => selectTab(x);
+for (const x of ["e","t","g","l"]) $("#tab-"+x).onclick = () => selectTab(x);
 document.querySelector(".tabs").addEventListener("keydown", e => {
-  const order = ["t","g","l"], cur = order.findIndex(x => $("#tab-"+x).getAttribute("aria-selected")==="true");
-  if (e.key==="ArrowRight"||e.key==="ArrowLeft"){ const n = order[(cur + (e.key==="ArrowRight"?1:2)) % 3]; selectTab(n); $("#tab-"+n).focus(); }
+  const order = ["e","t","g","l"], cur = order.findIndex(x => $("#tab-"+x).getAttribute("aria-selected")==="true");
+  if (e.key==="ArrowRight"||e.key==="ArrowLeft"){ const n = order[(cur + (e.key==="ArrowRight"?1:3)) % 4]; selectTab(n); $("#tab-"+n).focus(); }
 });
 let toastT;
 function toast(msg, err=false){
@@ -634,11 +832,15 @@ let pollT;
 async function poll(){
   clearTimeout(pollT);
   try{
-    const d = await api(`/api/estado?av=${S.av}&gv=${S.gv}${S.fmts ? "" : "&fmt=1"}`);
+    const d = await api(`/api/estado?av=${S.av}&gv=${S.gv}&ev=${S.ev}${S.fmts ? "" : "&fmt=1"}`);
     S.cfg = d.cfg; S.job = d.job;
+    if (S.catPend) S.cfg.catalogo = S.catLocal;
     let tomasCambio = false;
     if ("analisis" in d){ S.analisis = d.analisis; S.av = d.analisis_v; tomasCambio = true; }
     if (d.formatos){ S.fmts = d.formatos; S.orden = d.orden_formatos; }
+    if ("etiquetas" in d){ S.etiq = d.etiquetas || {}; S.lista = d.lista || []; S.ev = d.etiq_v;
+      const nombres = new Set(S.lista.map(f => f.archivo)); [...S.sel].forEach(a => nombres.has(a) || S.sel.delete(a));
+      if (!$("#pan-e").contains(document.activeElement)) renderEtiq(); }
     if ("guion" in d){ S.guion = d.guion; S.gv = d.guion_v; cargarReel(S.vi); if (!$("#pan-g").contains(document.activeElement)) renderGuion(); }
     renderSide(d); renderFmts(); renderSteps(d); renderLog(d.log);
     if (tomasCambio) renderTomas();
