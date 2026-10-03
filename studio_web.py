@@ -21,7 +21,8 @@ CFG_FILE = os.path.join(BASE, "studio_config.json")
 CFG = {"carpeta": os.path.join(AQUI, "Videos Dropaudioccs"), "vision": "gemma3:4b", "jev": "nimble:latest",
        "escritor": "glm-5.3:cloud", "whisper": "small", "paso": 3.0, "minimo": 0.5, "drafts": core.CAPCUT_DRAFTS,
        "vol_clips": 1.0, "vol_musica": 0.25, "musica": True, "nombre": "reel_auto_01", "rehacer": False,
-       "simultaneos": 6, "saltar_repetidos": True, "formatos": list(core.ORDEN_FORMATOS), "max_por_formato": 2, "catalogo": []}
+       "simultaneos": 6, "saltar_repetidos": True, "formatos": list(core.ORDEN_FORMATOS), "max_por_formato": 2, "catalogo": [],
+       "voz_en_off": True, "critico": True}
 if os.path.exists(CFG_FILE):
     CFG.update(json.load(open(CFG_FILE, encoding="utf-8")))
 
@@ -159,8 +160,12 @@ def t_analizar():
     return f"Análisis listo: {len(datos)} archivos y {n} tomas revisadas."
 
 
+def cfg_guion():
+    return {**CFG, "productos_info": productos_tienda()}
+
+
 def t_guion():
-    serie = core.hacer_serie(CFG["carpeta"], CFG, evento)
+    serie = core.hacer_serie(CFG["carpeta"], cfg_guion(), evento)
     ESTADO["guion_v"] += 1; ESTADO["borrador"] = None
     return f"Serie lista: {len(serie['videos'])} reels (" + ", ".join(v["titulo"] for v in serie["videos"]) + ")."
 
@@ -173,7 +178,13 @@ def t_armar():
     return f"{len(hechos)} borradores creados en CapCut: " + ", ".join(n for n, _ in hechos) + "."
 
 
-TAREAS = {"analizar": t_analizar, "guion": t_guion, "armar": t_armar, "modelos": t_modelos}
+def t_revisar():
+    serie = core.revisar_serie(CFG["carpeta"], cfg_guion(), evento)
+    ESTADO["guion_v"] += 1
+    return "Revisión lista: " + ", ".join(f"{v['titulo']} {v.get('revision', {}).get('puntaje', 0):.0f}/10" for v in serie["videos"])
+
+
+TAREAS = {"analizar": t_analizar, "guion": t_guion, "armar": t_armar, "modelos": t_modelos, "revisar": t_revisar}
 
 
 # ------------------------------------------------------------------ miniaturas

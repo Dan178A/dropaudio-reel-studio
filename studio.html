@@ -197,6 +197,11 @@ dialog#visor::backdrop{background:rgba(0,0,0,.72)}
 .marcar{display:grid;grid-template-columns:1fr auto;gap:8px}
 .avisos{border:1px solid var(--gold3);border-radius:var(--r2);padding:10px 14px;margin-bottom:14px;color:var(--gold2);font-size:13px}
 .avisos div+div{margin-top:4px}
+.nota{display:inline-grid;place-items:center;min-width:34px;padding:1px 6px;border-radius:99px;font:700 11px var(--f-title)}
+.nota.alta{background:var(--ok);color:#0b1a0f}.nota.media{background:var(--gold);color:#120f0a}.nota.baja{background:var(--red);color:#1a0b06}
+.critica{border:1px solid var(--line2);border-radius:var(--r);background:var(--card);padding:14px;margin-bottom:14px;display:grid;gap:8px}
+.critica .top3{display:flex;align-items:center;gap:10px;flex-wrap:wrap}.critica h4{margin:0;font:700 15px/1.2 var(--f-title);flex:1}
+.critica ul{margin:0;padding-left:18px;color:var(--muted);font-size:13px;display:grid;gap:3px}
 </style>
 </head>
 <body>
@@ -259,6 +264,8 @@ dialog#visor::backdrop{background:rgba(0,0,0,.72)}
       <div class="field"><label for="nSim">Análisis simultáneos</label><input type="number" id="nSim" data-k="simultaneos" min="1" max="16" step="1"></div>
     </div>
     <div class="help" style="margin:-4px 0 6px">Cuántos archivos y llamadas a Ollama van a la vez. Modelos <b>:cloud</b> aguantan 6–8; locales, lo que diga <code>OLLAMA_NUM_PARALLEL</code>.</div>
+    <label class="check"><input type="checkbox" id="kVoz" data-k="voz_en_off">Voz en off en todo el reel (menos donde alguien habla)</label>
+    <label class="check"><input type="checkbox" id="kCrit" data-k="critico">Crítico: revisar y corregir cada guion</label>
     <label class="check"><input type="checkbox" id="kRep" data-k="saltar_repetidos">Saltar fotogramas repetidos (toma quieta = misma descripción)</label>
     <label class="check"><input type="checkbox" id="kMus" data-k="musica">Agregar música de la marca</label>
     <label class="check"><input type="checkbox" id="kReh" data-k="rehacer">Rehacer análisis desde cero</label>
@@ -431,7 +438,7 @@ function renderSteps(d){
   const j = d.job, run = j.corriendo && j.tarea !== "modelos";
   const tieneA = !!(S.analisis && Object.keys(S.analisis).length), vs = videos().filter(v => v.clips?.length), tieneG = vs.length > 0;
   const st = {1: tieneA, 2: tieneG, 3: !!d.borrador};
-  const activo = run ? {analizar:1, guion:2, armar:3}[j.tarea] : (!tieneA ? 1 : !tieneG ? 2 : 3);
+  const activo = run ? {analizar:1, guion:2, revisar:2, armar:3}[j.tarea] : (!tieneA ? 1 : !tieneG ? 2 : 3);
   for (const i of [1,2,3]){
     const el = $("#st"+i);
     el.classList.toggle("hecho", st[i]); el.classList.toggle("activo", activo === i);
@@ -546,6 +553,22 @@ function habla(file, desde, seg){
   const d = S.analisis?.[file]; if (!d) return "";
   return (d.habla||[]).filter(h => h.fin > desde && h.ini < desde + seg).map(h => h.texto).join(" ");
 }
+function notaHTML(r){
+  if (!r) return "";
+  const n = +r.puntaje || 0, c = n >= 7.5 ? "alta" : n >= 5 ? "media" : "baja";
+  return `<span class="nota ${c}" title="Nota del crítico">${n.toFixed(0)}/10</span>`;
+}
+function criticaHTML(r){
+  const run = S.job.corriendo && S.job.tarea === "revisar";
+  if (!r) return `<div class="critica"><div class="top3"><h4>Sin revisión todavía</h4><button class="btn ghost sm" id="gRev" ${run?"disabled":""}>Revisar con el crítico</button></div></div>`;
+  const v = {publicar:"Listo para publicar", mejorar:"Se puede mejorar", descartar:"Mejor no publicarlo"}[r.veredicto] || r.veredicto;
+  return `<div class="critica" role="note">
+    <div class="top3">${notaHTML(r)}<h4>${esc(v)}${r.corregido ? " · el crítico corrigió el guion" : ""}</h4>
+      <button class="btn ghost sm" id="gRev" ${run?"disabled":""}><svg width="14" height="14"><use href="#i-refresh"/></svg>Revisar otra vez</button></div>
+    ${(r.corregido ? (r.problemas_despues||[]) : (r.problemas||[])).length ? `<ul>${(r.corregido ? r.problemas_despues : r.problemas).map(x=>`<li>${esc(x)}</li>`).join("")}</ul>` : `<p class="help" style="margin:0">Sin problemas detectados.</p>`}
+    ${r.corregido && (r.problemas||[]).length ? `<details><summary>Lo que vio antes de corregir</summary><ul>${r.problemas.map(x=>`<li>${esc(x)}</li>`).join("")}</ul></details>` : ""}
+  </div>`;
+}
 function cargarReel(i){
   const vs = videos(); S.vi = Math.max(0, Math.min(i, vs.length - 1));
   G = vs.length ? toUI(vs[S.vi]) : null; PASOS = pasosDe(G?.formato || "asi_compras");
@@ -554,13 +577,14 @@ function renderGuion(){
   const p = $("#pan-g"), vs = videos();
   if (!G){ $("#nG").textContent = "—"; p.innerHTML = `<div class="empty"><b>Todavía no hay guiones</b>Cuando termines el análisis, elige los formatos en el paso 2 y pulsa <b>Escribir guiones</b>. Saldrá un reel por formato (o más, si hay material) y podrás editar cada uno aquí.</div>`; return; }
   const total = G.clips.reduce((s,c)=>s+(+c.segundos||0),0);
-  const ok = total >= 28 && total <= 42;
+  const ok = total >= 28 && total <= 47;
   $("#nG").textContent = vs.length;
   const avisos = S.guion?.avisos || [];
   p.innerHTML = `
     <div class="reels" role="tablist" aria-label="Reels de la serie">${vs.map((v,i)=>{
       const dur = v.clips.reduce((s,c)=>s+(+c.segundos||0),0);
-      return `<button class="chip" role="tab" data-reel="${i}" aria-pressed="${i===S.vi}" aria-selected="${i===S.vi}">${esc(v.titulo || ("Reel " + (i+1)))} <small>${v.clips.length} clips · ${fmt(dur)}</small></button>`;}).join("")}</div>
+      return `<button class="chip" role="tab" data-reel="${i}" aria-pressed="${i===S.vi}" aria-selected="${i===S.vi}">${notaHTML(v.revision)}${esc(v.titulo || ("Reel " + (i+1)))} <small>${v.clips.length} clips · ${fmt(dur)}</small></button>`;}).join("")}</div>
+    ${criticaHTML(vs[S.vi].revision)}
     ${avisos.length ? `<div class="avisos" role="note">${avisos.map(a=>`<div>${esc(a)}</div>`).join("")}</div>` : ""}
     <div class="reelbar">
       <div class="field"><label for="gN">Nombre del borrador en CapCut</label><input type="text" id="gN" value="${esc(G.nombre || "")}" maxlength="60"></div>
@@ -569,11 +593,11 @@ function renderGuion(){
     </div>
     <div class="hook">
       <div>
-        <div class="field"><label for="gG">Gancho (problema del cliente, se ve en el primer cuadro)</label><input type="text" id="gG" value="${esc(G.gancho)}" maxlength="60"></div>
+        <div class="field"><label for="gG">Gancho (se ve en el primer cuadro)</label><input type="text" id="gG" value="${esc(G.gancho)}" maxlength="60"></div>
         <div class="field"><label for="gP">Promesa debajo del gancho</label><input type="text" id="gP" value="${esc(G.promesa)}" maxlength="50"></div>
       </div>
       <div><div class="field"><label>Así se verá</label><div class="hookprev" id="hookPrev">${esc(G.gancho)}</div></div>
-        <div class="durbox ${ok?"ok":"warn"}"><svg width="16" height="16"><use href="#i-${ok?"check":"x"}"/></svg>${fmt(total)} ${ok?"· duración ideal":"· la fórmula pide 30–40 s"}</div></div>
+        <div class="durbox ${ok?"ok":"warn"}"><svg width="16" height="16"><use href="#i-${ok?"check":"x"}"/></svg>${fmt(total)} ${ok?"· duración ideal":"· apunta a 30–45 s"}</div></div>
     </div>
     <div class="timeline" aria-hidden="true">${G.clips.map((c,i)=>`<div data-go="${i}" style="flex:${Math.max(+c.segundos,0.5)};background:${(PASOS[c.paso]||["","#6F675B"])[1]}" title="${esc(c.archivo)}">${esc((PASOS[c.paso]||[c.paso])[0])}</div>`).join("")}</div>
     <div class="ruler"><span>0 s</span><span>${fmt(total/2)}</span><span>${fmt(total)}</span></div>
@@ -587,6 +611,7 @@ function renderGuion(){
           <div class="times">
             ${c.foto ? "" : `<label>Desde <input type="number" step="0.1" min="0" data-i="${i}" data-c="desde" value="${c.desde}"></label>`}
             <label>Dura <input type="number" step="0.1" min="1" data-i="${i}" data-c="segundos" value="${c.segundos}"></label>
+            ${c.foto ? "" : `<label class="check" style="min-height:34px"><input type="checkbox" data-i="${i}" data-c="audio" ${c.audio?"checked":""}>Audio original</label>`}
             <label>Paso <select data-i="${i}" data-c="paso" style="width:150px;min-height:34px;padding:5px 30px 5px 9px">${Object.entries(PASOS).map(([k,[l]])=>`<option value="${k}" ${k===c.paso?"selected":""}>${l}</option>`).join("")}</select></label>
           </div>
           ${h ? `<p class="habla"><small>Lo que dices aquí (no se corta)</small>“${esc(h)}”</p>` : ""}
@@ -610,6 +635,7 @@ $("#pan-g").addEventListener("input", e => {
   if (t.id === "gN"){ G.nombre = t.value; }
   else if (t.id === "gG"){ G.gancho = t.value; $("#hookPrev").textContent = t.value; }
   else if (t.id === "gP") G.promesa = t.value;
+  else if (t.dataset.c === "audio") G.clips[t.dataset.i].audio = t.checked;
   else if (t.dataset.c) G.clips[t.dataset.i][t.dataset.c] = t.dataset.c === "paso" ? t.value : parseFloat(t.value) || 0;
   else if (t.dataset.n) G.clips[t.dataset.i].narr[t.dataset.j][t.dataset.n] = t.dataset.n === "en" ? parseFloat(t.value) || 0 : t.value;
   else return;
@@ -619,6 +645,11 @@ $("#pan-g").addEventListener("change", e => { if (e.target.dataset.c) { guardar(
 $("#pan-g").addEventListener("click", e => {
   const r = e.target.closest("[data-reel]");
   if (r){ if (G) guardar(true); cargarReel(+r.dataset.reel); renderGuion(); return; }
+  if (e.target.closest("#gRev")){
+    (async () => { if (G) { S.guion.videos[S.vi] = {...S.guion.videos[S.vi], ...fromUI(G)}; await api("/api/guion", S.guion); }
+      const r = await api("/api/tarea/revisar", {}); if (!r.ok) toast("Ya hay una tarea en curso.", true); poll(); })();
+    return;
+  }
   if (e.target.closest("#gDel")){
     if (!confirm(`¿Quitar «${G.titulo}» de la serie?`)) return;
     S.guion.videos.splice(S.vi, 1); cargarReel(S.vi); renderGuion(); guardar(true, true); return;
@@ -634,7 +665,7 @@ $("#pan-g").addEventListener("click", e => {
 function guardar(ahora, borrado=false){
   clearTimeout(saveT);
   const vi = S.vi;
-  if (G && !borrado) S.guion.videos[vi] = fromUI(G);
+  if (G && !borrado) S.guion.videos[vi] = {...S.guion.videos[vi], ...fromUI(G)};  // conserva revisión y material del plan
   saveT = setTimeout(async () => {
     const r = await api("/api/guion", S.guion);
     if (r.ok){ S.guion = r.guion; S.gv = r.guion_v; poll();

@@ -4,8 +4,10 @@ SR=44100; BPM=128; beat=60/BPM
 def music(total, cues, drop, cta, out):
     n=int(total*SR); t=np.arange(n)/SR; mix=np.zeros(n)
     def add(sig,at,g=1.0):
-        i=int(at*SR); j=min(n,i+len(sig)); 
-        if i<n: mix[i:j]+=g*sig[:j-i]
+        i=int(at*SR)
+        if i<0: sig=sig[-i:]; i=0   # golpe que caería antes del inicio: se recorta
+        j=min(n,i+len(sig))
+        if i<n and j>i: mix[i:j]+=g*sig[:j-i]
     env=lambda L,a,d: np.minimum(1,np.arange(L)/(a*SR+1))*np.exp(-np.arange(L)/(d*SR))
     # pad (acordes Am-F-C-G) con sidechain
     prog=[[220,261.6,329.6],[174.6,220,261.6],[261.6,329.6,392],[196,246.9,293.7]]

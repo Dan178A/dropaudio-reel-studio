@@ -5,121 +5,181 @@
    "nombre": "KZ EDX Pro X",
    "precio": 13.0,
    "categoria": "iem",
-   "stock": 12
+   "stock": 12,
+   "descripcion": "El KZ EDX Pro X es un audífono in-ear (IEM) con un driver dinámico de 10mm dual-magnético, conexión 3.5mm y cable desmontable 2-pin. Firma en V con bajos potentes y agudos claros. El KZ EDX Pro X es el mejor KZ para empezar: uso diario, música variada y gaming casual.",
+   "ideal_para": "Tu primer IEM: uso diario, música variada y gaming casual.",
+   "badge": "Entrada"
   },
   {
    "nombre": "KZ EDX Pro 2 (3.5mm)",
    "precio": 18.0,
    "categoria": "iem",
-   "stock": 5
+   "stock": 5,
+   "descripcion": "El KZ EDX Pro 2 es un IEM de un driver dinámico mejorado con conexión 3.5mm y cable desmontable 2-pin. Afinación equilibrada y cálida, más madura que el EDX Pro X. Ideal para música diaria con más detalle.",
+   "ideal_para": "Música diaria con más detalle y un sonido más maduro.",
+   "badge": "Equilibrado"
   },
   {
    "nombre": "KZ EDX Pro 2 (Type-C)",
    "precio": 20.0,
    "categoria": "iem",
-   "stock": 5
+   "stock": 5,
+   "descripcion": "El KZ EDX Pro 2 Type-C es un IEM con DAC USB-C integrado, sin necesidad de jack 3.5mm. Mantiene la afinación equilibrada del EDX Pro 2 y funciona plug and play en teléfonos modernos sin entrada de audio.",
+   "ideal_para": "Teléfonos modernos SIN puerto 3.5mm. Plug and play.",
+   "badge": "Sin jack 3.5mm"
   },
   {
    "nombre": "KZ Libra (High Res)",
    "precio": 18.0,
    "categoria": "iem",
-   "stock": 7
+   "stock": 7,
+   "descripcion": "El KZ Libra es un IEM de una armadura balanceada (BA) con cable plateado, 25Ω, 108dB y rango 20–40.000 Hz. Firma detallada y analítica. El KZ Libra es ideal para voces, instrumentos y escucha crítica.",
+   "ideal_para": "Voces, instrumentos, detalle y escucha analítica.",
+   "badge": "Detalle"
   },
   {
    "nombre": "KZ Castor (Harman)",
    "precio": 25.0,
    "categoria": "iem",
-   "stock": 0
+   "stock": 0,
+   "descripcion": "El KZ Castor (Harman) es un IEM de doble driver dinámico apilado con afinación Harman de referencia y cable 2-pin 0.78mm. Balance versátil y agradable con cualquier género musical.",
+   "ideal_para": "Sonido equilibrado y versátil para todo género.",
+   "badge": "Referencia"
   },
   {
    "nombre": "KZ Castor (Bass)",
    "precio": 25.0,
    "categoria": "iem",
-   "stock": 10
+   "stock": 10,
+   "descripcion": "El KZ Castor (Bass) es un IEM de doble driver dinámico apilado con afinación Bass y cable 2-pin 0.78mm. Entrega sub-graves con cuerpo (20–200Hz) sin enturbiar las voces. El KZ Castor (Bass) es ideal para EDM, hip-hop, reggaetón y gym.",
+   "ideal_para": "Bajos profundos: EDM, hip-hop, reggaetón y gym.",
+   "badge": "Bass"
   },
   {
    "nombre": "KZ Castor Pro (Harman)",
    "precio": 28.0,
    "categoria": "iem",
-   "stock": 10
+   "stock": 10,
+   "descripcion": "El KZ Castor Pro (Harman) es un IEM de doble driver dinámico con switches de afinación y cable 2-pin 0.78mm. La edición Harman ofrece un balance de referencia resolutivo y versátil para todo género.",
+   "ideal_para": "Sonido versátil y equilibrado para todo género.",
+   "badge": "Referencia"
   },
   {
    "nombre": "KZ Castor Pro (Bass)",
    "precio": 28.0,
    "categoria": "iem",
-   "stock": 10
+   "stock": 10,
+   "descripcion": "El KZ Castor Pro (Bass) es un IEM de doble driver dinámico con switches de afinación y cable 2-pin 0.78mm. La edición Bass entrega el golpe de la música urbana con más control. Ideal para reggaetón, hip-hop y electrónica.",
+   "ideal_para": "Bajos potentes pero con control y calidad.",
+   "badge": "Bass Pro"
   },
   {
    "nombre": "KZ ZSN PRO 2",
    "precio": 30.0,
    "categoria": "iem",
-   "stock": 0
+   "stock": 0,
+   "descripcion": "El KZ ZSN Pro 2 es un IEM híbrido (1 driver dinámico + 1 armadura balanceada) con cable 2-pin 0.75mm y conexión 3.5mm. Combina graves con cuerpo y agudos detallados a precio accesible.",
+   "ideal_para": "Quien quiere híbrido económico con buen detalle.",
+   "badge": "Híbrido"
   },
   {
    "nombre": "KZ Saga (Bass)",
    "precio": 23.0,
    "categoria": "iem",
-   "stock": 5
+   "stock": 5,
+   "descripcion": "El KZ Saga (Bass) es un IEM de driver dinámico con bajo mejorado y cable 2-pin (3.5mm). Ofrece buena relación precio/golpe para géneros urbanos y electrónicos.",
+   "ideal_para": "Amantes del bajo que buscan buena relación precio/golpe.",
+   "badge": "Bass+"
   },
   {
    "nombre": "KZ ZS10 PRO 2",
    "precio": 45.0,
    "categoria": "iem",
-   "stock": 5
+   "stock": 5,
+   "descripcion": "El KZ ZS10 Pro 2 es un IEM multidriver híbrido (1 driver dinámico + 4 armaduras balanceadas) con cable 2-pin 0.75mm. Ofrece máximo detalle, separación de instrumentos y escena amplia. El KZ ZS10 Pro 2 es ideal para escucha técnica y analítica.",
+   "ideal_para": "Quien busca máximo detalle, separación y nivel técnico.",
+   "badge": "Multidriver"
   },
   {
    "nombre": "KZ Sora (Bluetooth)",
    "precio": 30.0,
    "categoria": "wireless",
-   "stock": 1
+   "stock": 1,
+   "descripcion": "El KZ Sora es un audífono inalámbrico con Bluetooth 5.4, baja latencia y hasta ~25h de batería con el estuche. El KZ Sora es ideal para gym, correr y llamadas sin cables.",
+   "ideal_para": "Gym, correr, llamadas y libertad sin cables.",
+   "badge": "Inalámbrico"
   },
   {
    "nombre": "KZ AE01 (Adaptador BT)",
    "precio": 35.0,
    "categoria": "wireless",
-   "stock": 10
+   "stock": 10,
+   "descripcion": "El KZ AE01 no es un audífono: es un adaptador Bluetooth tipo earhook con pin tipo C (0.78mm). El KZ AE01 convierte tus IEM cableados KZ, CCA, TRN, NF Audio o QDC en inalámbricos.",
+   "ideal_para": "Libera del cable tus IEM KZ cableados que ya tienes.",
+   "badge": "Convierte a inalámbrico"
   },
   {
    "nombre": "KZ AM01 DAC",
    "precio": 15.0,
    "categoria": "dac",
-   "stock": 10
+   "stock": 10,
+   "descripcion": "El KZ AM01 es un DAC dongle USB Type-C a 3.5mm compacto. El KZ AM01 recupera una salida de audio de calidad en teléfonos y laptops que ya no traen jack 3.5mm.",
+   "ideal_para": "Recuperar el jack 3.5mm en tu teléfono con mejor calidad.",
+   "badge": "DAC"
   },
   {
    "nombre": "KZ AM02 DAC",
    "precio": 18.0,
    "categoria": "dac",
-   "stock": 10
+   "stock": 10,
+   "descripcion": "El KZ AM02 es un DAC dongle USB Type-C a 3.5mm con más potencia de salida que el AM01. Ideal para mover IEM más exigentes desde teléfonos y laptops sin jack.",
+   "ideal_para": "Más potencia y calidad para tus IEM exigentes.",
+   "badge": "DAC"
   },
   {
    "nombre": "KZ M2 Dual-Mic (Type-C)",
    "precio": 18.0,
    "categoria": "dac",
-   "stock": 10
+   "stock": 10,
+   "descripcion": "El KZ M2 es un DAC USB Type-C a 3.5mm con doble micrófono. Suma audio cableado de calidad más buena captación de voz para llamadas y gaming.",
+   "ideal_para": "Llamadas y gaming con buena captación de voz.",
+   "badge": "DAC + Mic"
   },
   {
    "nombre": "Estuche Oval KZ",
    "precio": 5.0,
    "categoria": "accesorio",
-   "stock": 40
+   "stock": 40,
+   "descripcion": "El Estuche Oval KZ es un estuche rígido con cierre, universal para IEM y cables. Protege tus audífonos de golpes y humedad al transportarlos.",
+   "ideal_para": "Proteger y transportar tus IEM y cables.",
+   "badge": "Accesorio"
   },
   {
    "nombre": "Cable Silver Upgrade",
    "precio": 8.0,
    "categoria": "accesorio",
-   "stock": 10
+   "stock": 10,
+   "descripcion": "El Cable Silver Upgrade es un cable de cobre plateado con conector 2-pin 0.75mm para IEM KZ. Mejora la estética, la terminación y la conductividad de tus audífonos.",
+   "ideal_para": "Mejorar estética y conductividad de tus IEM.",
+   "badge": "Upgrade"
   },
   {
    "nombre": "Cable DAC Type-C",
    "precio": 15.0,
    "categoria": "accesorio",
-   "stock": 8
+   "stock": 8,
+   "descripcion": "El Cable DAC Type-C es un cable con DAC USB-C integrado y salida 2-pin para IEM. Conecta tus audífonos KZ de 2-pin a teléfonos modernos sin jack 3.5mm.",
+   "ideal_para": "Usar tus IEM en teléfonos sin puerto 3.5mm.",
+   "badge": "Sin jack 3.5mm"
   },
   {
    "nombre": "Intercomunicador Y12 Pro",
    "precio": 25.0,
    "categoria": "intercom",
-   "stock": 10
+   "stock": 10,
+   "descripcion": "El Y12 Pro es un intercomunicador Bluetooth 5.4 dual-core para casco de moto, con parlantes planos HD y micrófono de brazo flexible. Permite hablar casco a casco sin sacar el teléfono, se empareja con intercomunicadores de otras marcas y baja la música o el GPS automáticamente cuando entra una llamada. Montaje con clip o adhesivo y carga por USB.",
+   "ideal_para": "Motorizados que ruedan en grupo y necesitan hablar sin soltar el manubrio.",
+   "badge": "Nuevo"
   }
  ]
 }

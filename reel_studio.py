@@ -39,7 +39,7 @@ CTA = "Revisas. Escuchas. Luego pagas."
 
 GUION = """Eres editor de reels de DropAudio CCS (audífonos KZ originales en Venezuela; entrega en moto en Caracas,
 Guarenas y Guatire; el cliente revisa y prueba ANTES de pagar; 7 días de garantía; precios solo en $).
-Arma UN reel vertical de 30 a 40 segundos de formato «{titulo}» con esta estructura:
+Arma UN reel vertical de 30 a 45 segundos de formato «{titulo}» con esta estructura:
   {estructura}
 Si no hay tomas para un paso, sáltalo. Usa SOLO los archivos del material.
 Reglas:
@@ -47,17 +47,28 @@ Reglas:
   Si hay una toma de persona hablando a cámara, úsala para el gancho.
 - NUNCA cortes una frase: si un clip tiene habla, 'desde' y 'hasta' deben caer fuera de las frases
   (usa los tiempos de 'habla'). Incluye completas las frases útiles.
-- Clips de 2 a 12 s. Fotos: 'desde' 0 y 'hasta' 3 a 5. No repitas el mismo tramo.
-- Narración: frases cortas (máx. 12 palabras), tono cercano venezolano, solo sobre clips SIN habla.
-  'en' es el segundo dentro del clip. No nombres clientes ni des teléfonos de clientes.
+- Clips de 2 a 8 s (hasta 12 s solo si alguien habla). Fotos: 'desde' 0 y 'hasta' 3 a 5. No repitas el mismo tramo.
+- El orden debe tener sentido: la caja cerrada va antes que la caja abierta, conectar antes que escuchar, etc.
+- El producto tiene que verse de cerca al menos 10 s en total. Ningún plano quieto más de 5 s.
+{voz}
+- No nombres clientes ni des teléfonos de clientes.
 - Prefiere tomas con usable (u) alto e interés (i) alto.
 - Productos y precios: usa SOLO los que trae el material («producto: … ($…)»). No inventes modelos ni precios;
-  si un archivo no dice producto, no le pongas nombre ni precio.
+  si un archivo no dice producto, no le pongas nombre ni precio. Si vienen «datos del producto», son reales:
+  úsalos para la narración y no inventes especificaciones que no estén ahí.
 Responde SOLO con JSON:
 {{"gancho": "...", "promesa": "frase corta bajo el gancho",
- "clips": [{{"archivo": "...", "desde": 0.0, "hasta": 0.0, "paso": "gancho|1|2|3|4|5|cta", "motivo": "..."}}],
+ "clips": [{{"archivo": "...", "desde": 0.0, "hasta": 0.0, "paso": "gancho|1|2|3|4|5|cta", "audio": false, "motivo": "..."}}],
  "narracion": [{{"clip": 0, "en": 0.3, "texto": "..."}}]}}
 """
+
+VOZ_EN_OFF = """- VOZ EN OFF: el reel se cuenta con una voz en off continua (luego se genera en CapCut). Escribe narración para
+  CADA clip sin habla importante: unas 2,5 palabras por segundo de clip (un clip de 4 s ≈ 10 palabras), frases que
+  se conecten como un solo relato, tono cercano venezolano, que expliquen y vendan sin exagerar.
+  En los clips donde alguien dice algo clave (reacción, explicación, cliente) NO narres: marca ese clip con
+  "audio": true para dejar su sonido original. 'en' es el segundo dentro del clip donde empieza la frase."""
+VOZ_PUNTUAL = """- Narración: frases cortas (máx. 12 palabras), tono cercano venezolano, solo sobre clips SIN habla.
+  'en' es el segundo dentro del clip. Marca con "audio": true los clips cuyo sonido original importa."""
 
 # Formatos de la serie. «nucleo»: tipos de toma que definen el formato; «apoyo»: los que lo completan.
 # «reglas»: qué tipos buscar en cada paso cuando no hay modelo de texto (o si falla).
@@ -84,6 +95,18 @@ FORMATOS = {
         "reglas": [("gancho", ["persona", "prueba_sonido"]), ("1", ["producto_detalle", "persona"]),
                    ("2", ["prueba_sonido", "unboxing"]), ("3", ["prueba_sonido"]), ("4", ["producto_detalle"]),
                    ("5", ["persona", "prueba_sonido"]), ("cta", ["producto_detalle", "persona"])]},
+    "educativo": {
+        "titulo": "Educativo", "kicker": "DATO", "por_producto": True, "reusa": True,
+        "gancho_ej": "3 cosas que nadie te dice de estos KZ", "gancho_prod": "3 cosas del {p} antes de comprarlo",
+        "promesa": "Míralo antes de comprar ↓",
+        "pasos": {"1": "Dato 1", "2": "Dato 2", "3": "Dato 3", "4": "Para quién es", "5": "Precio"},
+        "estructura": "gancho (pregunta o mito) -> 1 primer dato útil -> 2 segundo dato -> 3 tercer dato -> "
+                      "4 para quién es -> 5 precio y garantía -> cta. La voz en off explica; las tomas muestran "
+                      "el producto de cerca, puesto, conectado. Contenido que enseña, no un unboxing.",
+        "nucleo": ["producto_detalle", "prueba_sonido", "unboxing"], "apoyo": ["persona"],
+        "reglas": [("gancho", ["persona", "producto_detalle"]), ("1", ["producto_detalle"]), ("2", ["unboxing", "producto_detalle"]),
+                   ("3", ["prueba_sonido", "producto_detalle"]), ("4", ["prueba_sonido", "persona"]),
+                   ("5", ["producto_detalle"]), ("cta", ["producto_detalle", "persona"])]},
     "entregas": {
         "titulo": "Entregas", "kicker": "ENTREGA", "gancho_ej": "Así llegan tus KZ en Caracas",
         "promesa": "En moto, hasta tu mano ↓",
@@ -104,7 +127,34 @@ FORMATOS = {
                    ("4", ["prueba_sonido", "unboxing"]), ("5", ["pago"]),
                    ("cta", ["producto_detalle", "persona", "otro"])]},
 }
-ORDEN_FORMATOS = ["unboxing", "review", "entregas", "asi_compras"]
+ORDEN_FORMATOS = ["unboxing", "review", "educativo", "entregas", "asi_compras"]
+
+
+# Voz en off de respaldo cuando no hay modelo de texto (el modelo la escribe mucho mejor)
+NARR_REGLAS = {
+    "unboxing": {"gancho": "¿Original o réplica? Te lo abro aquí mismo.", "1": "Viene sellado de fábrica, como debe ser.",
+                 "2": "Lo abrimos con calma para que veas todo.", "3": "Esto es lo que trae la caja.",
+                 "4": "Fíjate en el acabado de cerca.", "5": "{p}, a {pr}, con siete días de garantía.",
+                 "cta": "Comenta asesoría y te ayudamos a elegir."},
+    "review": {"gancho": "¿Vale la pena? Te lo pruebo.", "1": "Este es el {p}.", "2": "Lo conectamos y vamos a escucharlo.",
+               "3": "Escucha cómo suena.", "4": "Mira los detalles de construcción.", "5": "Por {pr}, para mí sí vale la pena.",
+               "cta": "Comenta asesoría y te ayudamos a elegir."},
+    "educativo": {"gancho": "Antes de comprarlo, mira esto.", "1": "Primero: así se ve de cerca el {p}.",
+                  "2": "Segundo: esto es lo que trae la caja.", "3": "Tercero: así suena puesto.",
+                  "4": "Es para ti si quieres mejor sonido sin gastar de más.", "5": "Cuesta {pr} y tiene siete días de garantía.",
+                  "cta": "Comenta asesoría y te ayudamos a elegir."},
+    "entregas": {"gancho": "Así llegan tus KZ.", "1": "Tu pedido sale listo y sellado.", "2": "Vamos en moto hasta tu mano.",
+                 "3": "Llegamos.", "4": "Lo conectas y lo pruebas ahí mismo.", "5": "Y solo si te gusta, pagas.",
+                 "cta": "Comenta asesoría."},
+    "asi_compras": {"gancho": "¿Pagas antes y rezas que llegue?", "1": "Paso uno: eliges tu modelo.",
+                    "2": "Paso dos: nos escribes.", "3": "Paso tres: vamos a ti, en moto.",
+                    "4": "Paso cuatro: lo pruebas ahí mismo.", "5": "Y solo entonces, pagas.", "cta": "Comenta asesoría."},
+}
+
+
+def nombre_corto(p):
+    """«KZ AE01 (Adaptador BT)» -> «KZ AE01» para ganchos y textos en pantalla."""
+    return re.sub(r"\s*\([^)]*\)", "", p or "").strip() or p
 
 
 # ---------------------------------------------------------------- Ollama
@@ -148,12 +198,14 @@ def decidir(desc, habla, modelo):
             "interes": round(a["interes"]["score"] / 2, 3)}  # score viene en índice 0..2
 
 
-def escribir_guion(material, modelo, log=lambda *a: None, limite=600, formato="asi_compras"):
+def escribir_guion(material, modelo, log=lambda *a: None, limite=600, formato="asi_compras", voz=True, sistema=None,
+                   esquema=None):
     """Pide el guion en streaming: se ve el avance (pensando / escribiendo) y nunca se queda colgado sin aviso.
     Desactiva el «razonamiento» largo de los modelos que piensan (think: false) si el modelo lo admite."""
-    body = {"model": modelo, "stream": True, "format": ESQUEMA_GUION, "think": False,
+    body = {"model": modelo, "stream": True, "format": esquema or ESQUEMA_GUION, "think": False,
             "options": {"num_ctx": 16384, "num_predict": 3000, "temperature": 0.5},
-            "messages": [{"role": "system", "content": prompt_formato(formato)}, {"role": "user", "content": material}]}
+            "messages": [{"role": "system", "content": sistema or prompt_formato(formato, voz)},
+                         {"role": "user", "content": material}]}
     inicio, ultimo, txt, pensado = time.time(), 0, [], 0
     for intento in (1, 2):
         try:
@@ -207,8 +259,9 @@ ESQUEMA_GUION = {
             "type": "object", "required": ["archivo", "desde", "hasta", "paso"],
             "properties": {"archivo": {"type": "string"}, "desde": {"type": "number"}, "hasta": {"type": "number"},
                            "paso": {"type": "string", "enum": ["gancho", "1", "2", "3", "4", "5", "cta"]},
+                           "audio": {"type": "boolean"},
                            "motivo": {"type": "string"}}}},
-        "narracion": {"type": "array", "maxItems": 10, "items": {
+        "narracion": {"type": "array", "maxItems": 20, "items": {
             "type": "object", "required": ["clip", "en", "texto"],
             "properties": {"clip": {"type": "integer"}, "en": {"type": "number"}, "texto": {"type": "string"}}}}}}
 
@@ -507,7 +560,8 @@ def validar(sel, datos, permitidos=None):
         if hasta - desde < 1.0:
             continue
         clips.append({"archivo": d["archivo"], "foto": d["foto"], "desde": round(desde, 2),
-                      "segundos": round(hasta - desde, 2), "paso": str(c.get("paso", "")), "motivo": c.get("motivo", "")})
+                      "segundos": round(hasta - desde, 2), "paso": str(c.get("paso", "")), "motivo": c.get("motivo", ""),
+                      "audio": bool(c.get("audio"))})
     sel["clips"] = clips
     sel["narracion"] = [n for n in sel.get("narracion", []) if 0 <= int(n.get("clip", -1)) < len(clips) and n.get("texto")]
     f = FORMATOS.get(sel.get("formato"), FORMATOS["asi_compras"])
@@ -517,16 +571,17 @@ def validar(sel, datos, permitidos=None):
     return sel
 
 
-def prompt_formato(formato):
+def prompt_formato(formato, voz=True):
     f = FORMATOS.get(formato, FORMATOS["asi_compras"])
-    return GUION.format(titulo=f["titulo"], estructura=f["estructura"], gancho_ej=f["gancho_ej"])
+    return GUION.format(titulo=f["titulo"], estructura=f["estructura"], gancho_ej=f["gancho_ej"],
+                        voz=VOZ_EN_OFF if voz else VOZ_PUNTUAL)
 
 
 def guion_por_reglas(datos, minimo, formato="asi_compras"):
     """Respaldo sin modelo de texto: la mejor toma para cada paso del formato, sin repetir tramos.
     Junta tomas buenas seguidas del mismo archivo (hasta ~6 s) para que el reel no quede demasiado corto."""
     tomas = sorted(((d, t) for d in datos.values() for t in d["tomas"] if t["usable"] >= minimo),
-                   key=lambda x: x[1]["usable"] * x[1]["interes"], reverse=True)
+                   key=lambda x: x[1]["usable"] * x[1]["interes"] * (0.4 if x[1].get("repetida") else 1), reverse=True)
     usados, clips = set(), []
     for paso, tipos in FORMATOS.get(formato, FORMATOS["asi_compras"])["reglas"]:
         for d, t in tomas:
@@ -535,12 +590,15 @@ def guion_por_reglas(datos, minimo, formato="asi_compras"):
                 hasta = t["inicio"] + t["dur"]
                 for s in sorted(d["tomas"], key=lambda x: x["inicio"]):  # alargar con las tomas buenas siguientes
                     if s["inicio"] >= hasta - 0.01 and s["inicio"] < hasta + 0.01 and s["usable"] >= minimo \
-                            and hasta - t["inicio"] < 6 and (d["archivo"], s["inicio"]) not in usados:
+                            and not s.get("repetida") and hasta - t["inicio"] < 8 and (d["archivo"], s["inicio"]) not in usados:
                         usados.add((d["archivo"], s["inicio"])); hasta = s["inicio"] + s["dur"]
                 clips.append({"archivo": d["archivo"], "desde": t["inicio"], "hasta": hasta,
                               "paso": paso, "motivo": f"{TIPOS.get(t['tipo'], t['tipo'])} (reglas)"})
                 break
     return {"clips": clips, "narracion": []}
+
+
+MIN_MATERIAL = 35  # segundos de tomas buenas para que valga la pena un reel
 
 
 def planear_serie(datos, minimo, formatos, max_por=2):
@@ -559,21 +617,21 @@ def planear_serie(datos, minimo, formatos, max_por=2):
         info.append({"archivo": d["archivo"], "tipo": tipo, "peso": peso[tipo], "producto": d.get("producto"),
                      "seg": sum(t["dur"] for t in buenas)})
     info.sort(key=lambda x: x["peso"], reverse=True)
-    usados, planes, avisos, cuenta = set(), [], [], {}
+    usados, usados_edu, planes, avisos, cuenta = set(), set(), [], [], {}
 
     def armar_plan(fk, f, nucleo, apoyo, producto):
         elegidos, seg = [], 0.0
         for x in nucleo:  # el corazón del reel
-            if seg >= 20 or len(elegidos) >= 5:
+            if seg >= 30 or len(elegidos) >= 7:
                 break
             elegidos.append(x); seg += x["seg"]
         for x in apoyo:  # lo completa hasta tener material de sobra
-            if seg >= 50 or len(elegidos) >= 9:
+            if seg >= 60 or len(elegidos) >= 11:
                 break
             elegidos.append(x); seg += x["seg"]
-        if seg < 20:
+        if seg < MIN_MATERIAL:  # menos de esto sale un reel corto que no engancha
             return None, seg
-        usados.update(x["archivo"] for x in elegidos)
+        (usados_edu if f.get("reusa") else usados).update(x["archivo"] for x in elegidos)
         cuenta[fk] = cuenta.get(fk, 0) + 1
         return {"formato": fk, "n": cuenta[fk], "producto": producto, "archivos": [x["archivo"] for x in elegidos],
                 "segundos_material": round(seg, 1)}, seg
@@ -583,7 +641,8 @@ def planear_serie(datos, minimo, formatos, max_por=2):
             f = FORMATOS.get(fk)
             if not f:
                 continue
-            libres = [x for x in info if x["archivo"] not in usados]
+            # el educativo puede volver a usar tomas de los otros reels del mismo producto: cuenta otra historia
+            libres = [x for x in info if x["archivo"] not in (usados_edu if f.get("reusa") else usados)]
             nucleo = [x for x in libres if x["tipo"] in f["nucleo"]]
             if not nucleo:
                 if ronda == 0:
@@ -593,23 +652,139 @@ def planear_serie(datos, minimo, formatos, max_por=2):
             if f.get("por_producto"):
                 # un reel por producto; los archivos sin producto se juntan solo entre ellos
                 for prod in dict.fromkeys(x["producto"] for x in nucleo):
-                    nuc = [x for x in nucleo if x["producto"] == prod and x["archivo"] not in usados]
+                    ya = usados_edu if f.get("reusa") else usados
+                    nuc = [x for x in nucleo if x["producto"] == prod and x["archivo"] not in ya]
                     apo = [x for x in libres if x["tipo"] in f["apoyo"] and x["producto"] == prod
-                           and x["archivo"] not in usados and x not in nuc]
+                           and x["archivo"] not in ya and x not in nuc]
                     plan, seg = armar_plan(fk, f, nuc, apo, prod)
                     if plan:
                         planes.append(plan)
                     elif ronda == 0:
                         avisos.append(f"{f['titulo']} {prod or '(sin producto)'}: solo hay {seg:.0f} s de tomas "
-                                      "buenas; hace falta más material de ese modelo.")
+                                      f"buenas (mínimo {MIN_MATERIAL} s); no lo armo para que no salga corto.")
             else:
                 apo = [x for x in libres if x["tipo"] in f["apoyo"]]
                 plan, seg = armar_plan(fk, f, nucleo, apo, None)
                 if plan:
                     planes.append(plan)
                 elif ronda == 0:
-                    avisos.append(f"{f['titulo']}: solo hay {seg:.0f} s de tomas buenas; hace falta más material.")
+                    avisos.append(f"{f['titulo']}: solo hay {seg:.0f} s de tomas buenas (mínimo {MIN_MATERIAL} s); no lo armo.")
     return planes, avisos
+
+
+# ---------------------------------------------------------------- 2b. el crítico
+CRITICO = """Eres el editor más exigente de reels de DropAudio CCS (audífonos KZ en Venezuela). Te pasan el guion de UN
+reel de formato «{titulo}», clip por clip, con lo que se ve, lo que se dice y la voz en off. Revísalo como alguien que
+quiere que la gente lo vea completo y compre. Pregúntate:
+- ¿El primer segundo engancha? ¿El gancho tiene que ver con lo que se ve?
+- ¿El orden tiene sentido? (caja cerrada antes que abierta, conectar antes que escuchar, nada que salte hacia atrás)
+- ¿Se ve el producto lo suficiente, de cerca? ¿Hay planos quietos o repetidos que aburren?
+- ¿Dura 30-45 s? Si es más corto, no genera engagement.
+- ¿La voz en off cuenta una historia y explica algo útil, o solo describe lo obvio? ¿Respeta los momentos con habla?
+- ¿Los textos en pantalla (pasos) coinciden con lo que se ve en ese clip?
+- ¿Hay precios o datos inventados?
+Si se puede mejorar con el MISMO material, devuelve el guion corregido completo (mismos archivos, puedes reordenar,
+quitar, cambiar tiempos, pasos y narración). Si el material no da para un buen reel, di «descartar».
+Responde SOLO con JSON: {{"puntaje": 0-10, "veredicto": "publicar|mejorar|descartar", "problemas": ["..."],
+ "guion": {{...mismo formato del guion...}} o null}}"""
+
+ESQUEMA_CRITICA = {
+    "type": "object", "required": ["puntaje", "veredicto", "problemas"],
+    "properties": {"puntaje": {"type": "number"}, "veredicto": {"type": "string", "enum": ["publicar", "mejorar", "descartar"]},
+                   "problemas": {"type": "array", "maxItems": 8, "items": {"type": "string"}},
+                   "guion": {"anyOf": [ESQUEMA_GUION, {"type": "null"}]}}}
+
+
+def guion_en_texto(sel, datos):
+    """El guion clip por clip, como lo vería un editor: qué se ve, qué se dice y qué narra la voz."""
+    f = FORMATOS.get(sel.get("formato"), FORMATOS["asi_compras"])
+    pasos = {"gancho": "GANCHO", "cta": "CTA", **{k: f"{f['kicker']} 0{k} · {v}" for k, v in f["pasos"].items()}}
+    lin, t = [f"Gancho en pantalla: «{sel.get('gancho', '')}» / {sel.get('promesa', '')}"], 0.0
+    for i, c in enumerate(sel["clips"]):
+        d = datos.get(c["archivo"], {}); a, b = c["desde"], c["desde"] + c["segundos"]
+        tomas = [x for x in d.get("tomas", []) if x["inicio"] < b and x["inicio"] + x["dur"] > a]
+        ve = " / ".join(dict.fromkeys(" ".join(x["descripcion"].split())[:140] for x in tomas[:2])) or "(sin descripción)"
+        quieto = sum(x["dur"] for x in tomas if x.get("repetida"))
+        dicho = " ".join(h["texto"] for h in d.get("habla", []) if h["fin"] > a and h["ini"] < b)
+        narr = " ".join(n["texto"] for n in sel.get("narracion", []) if int(n["clip"]) == i)
+        lin.append(f"{i}. [{t:.1f}-{t + c['segundos']:.1f}s] {pasos.get(c['paso'], c['paso'] or '-')} · {c['archivo']} "
+                   f"{a:.1f}-{b:.1f}s · {tomas[0]['tipo'] if tomas else '?'}{' · FOTO' if c.get('foto') else ''}"
+                   f"{f' · {quieto:.0f}s quieto' if quieto else ''}{' · audio original' if c.get('audio') else ''}\n"
+                   f"   se ve: {ve}" + (f"\n   se dice: «{dicho}»" if dicho else "") + (f"\n   voz en off: «{narr}»" if narr else ""))
+        t += c["segundos"]
+    lin.append(f"Duración total: {t:.1f} s")
+    return "\n".join(lin)
+
+
+def chequeos(sel, datos, voz=True):
+    """Revisión sin IA: lo que se puede medir. Devuelve (problemas, graves)."""
+    probs, graves = [], 0
+    dur = sum(c["segundos"] for c in sel["clips"])
+    if dur < 20:
+        probs.append(f"Dura {dur:.0f} s: demasiado corto, no va a enganchar (apunta a 30-45 s)."); graves += 3
+    elif dur < 25:
+        probs.append(f"Dura {dur:.0f} s: muy corto para enganchar (apunta a 30-45 s)."); graves += 2
+    elif dur > 50:
+        probs.append(f"Dura {dur:.0f} s: largo; recorta a 30-45 s."); graves += 1
+    vistos, prod_seg, fotos = set(), 0.0, 0.0
+    for i, c in enumerate(sel["clips"]):
+        d = datos.get(c["archivo"], {}); a, b = c["desde"], c["desde"] + c["segundos"]
+        tomas = [x for x in d.get("tomas", []) if x["inicio"] < b and x["inicio"] + x["dur"] > a]
+        if any(x["tipo"] in ("producto_detalle", "unboxing", "prueba_sonido") for x in tomas):
+            prod_seg += c["segundos"]
+        quieto = sum(min(b, x["inicio"] + x["dur"]) - max(a, x["inicio"]) for x in tomas if x.get("repetida"))
+        if quieto > 5:
+            probs.append(f"Clip {i} ({c['archivo']}): {quieto:.0f} s de plano quieto; acórtalo o cúbrelo con voz."); graves += 1
+        clave = (c["archivo"], round(a))
+        if clave in vistos:
+            probs.append(f"Clip {i}: repite un tramo ya usado."); graves += 1
+        vistos.add(clave)
+        if c.get("foto"):
+            fotos += c["segundos"]
+    if sel.get("formato") in ("unboxing", "review", "educativo") and prod_seg < 10:
+        probs.append(f"El producto se ve solo {prod_seg:.0f} s; muéstralo más de cerca."); graves += 1
+    if dur and fotos / dur > 0.4:
+        probs.append("Más del 40 % son fotos; se siente estático."); graves += 1
+    nums = [int(c["paso"]) for c in sel["clips"] if c["paso"].isdigit()]
+    if any(b < a for a, b in zip(nums, nums[1:])):
+        probs.append("Los pasos van desordenados (un paso vuelve atrás)."); graves += 1
+    if voz:
+        sin_habla = [i for i, c in enumerate(sel["clips"]) if not c.get("audio")]
+        con_voz = {int(n["clip"]) for n in sel.get("narracion", [])}
+        faltan = sum(sel["clips"][i]["segundos"] for i in sin_habla if i not in con_voz)
+        if faltan > dur * 0.5:
+            probs.append(f"{faltan:.0f} s sin voz en off ni audio útil: quedan huecos."); graves += 1
+    return probs, graves
+
+
+def revisar(sel, datos, permitidos, cfg, log, titulo):
+    """El crítico: primero lo medible; luego (si hay modelo de texto) un editor exigente que puede corregir el guion."""
+    voz = cfg.get("voz_en_off", True)
+    probs, graves = chequeos(sel, datos, voz)
+    rev = {"puntaje": max(0, 10 - 2 * graves),
+           "veredicto": "publicar" if graves == 0 else "descartar" if graves >= 3 else "mejorar",
+           "problemas": probs, "corregido": False, "por": "reglas"}
+    if cfg["escritor"] != "(reglas, sin IA)" and cfg.get("critico", True):
+        try:
+            log("estado", f"{titulo}: el crítico está revisando…")
+            crit = escribir_guion(guion_en_texto(sel, datos) + ("\n\nProblemas medidos: " + " ".join(probs) if probs else ""),
+                                  cfg["escritor"], lambda t, x: None, sistema=CRITICO.format(titulo=titulo),
+                                  esquema=ESQUEMA_CRITICA, limite=300)
+            rev.update(puntaje=float(crit.get("puntaje", rev["puntaje"])), veredicto=crit.get("veredicto", rev["veredicto"]),
+                       problemas=list(dict.fromkeys(probs + list(crit.get("problemas") or []))), por="crítico")
+            nuevo = crit.get("guion")
+            if rev["veredicto"] == "mejorar" and isinstance(nuevo, dict) and nuevo.get("clips"):
+                cand = validar(dict(nuevo, formato=sel.get("formato")), datos, permitidos)
+                p2, g2 = chequeos(cand, datos, voz)
+                if cand["clips"] and g2 <= graves:  # solo si no empeora lo medible
+                    for k in ("gancho", "promesa", "clips", "narracion"):
+                        sel[k] = cand[k]
+                    rev.update(corregido=True, problemas_despues=p2)
+        except Exception as e:
+            log("error", f"{titulo}: el crítico no respondió ({e}); queda la revisión por reglas.")
+    sel["revision"] = rev
+    log("estado", f"{titulo}: {rev['puntaje']:.0f}/10 · {rev['veredicto']}" + (" (corregido)" if rev["corregido"] else ""))
+    return sel
 
 
 def hacer_serie(carpeta, cfg, log):
@@ -641,25 +816,39 @@ def hacer_serie(carpeta, cfg, log):
                 cab = ""
                 if plan.get("producto"):
                     pr = precio_de(plan["producto"], cfg.get("catalogo", []))
-                    cab = (f"Este reel es SOLO del {plan['producto']}"
-                           + (f" (precio ${pr:g})" if isinstance(pr, (int, float)) else "") + ". No nombres otros modelos.\n")
+                    cab = (f"Este reel es SOLO del {plan['producto']} (en pantalla dile «{nombre_corto(plan['producto'])}»)"
+                           + (f", precio ${pr:g}" if isinstance(pr, (int, float)) else "") + ". No nombres otros modelos.\n")
+                    info = next((x for x in cfg.get("productos_info", [])
+                                 if x.get("nombre", "").lower() == plan["producto"].lower()), None)
+                    if info:
+                        cab += "Datos del producto (reales, de la tienda): " + " ".join(
+                            str(info[k]) for k in ("descripcion", "ideal_para", "badge") if info.get(k)) + "\n"
                 sel = escribir_guion(cab + material_para_llm(sub, cfg["minimo"]), cfg["escritor"],
-                                     lambda t, x: log(t, f"{titulo}: {x}"), formato=plan["formato"])
+                                     lambda t, x: log(t, f"{titulo}: {x}"), formato=plan["formato"],
+                                     voz=cfg.get("voz_en_off", True))
             except Exception as e:
                 log("error", f"{titulo}: el modelo falló ({e}). Uso reglas; puedes editarlo.")
                 sel = guion_por_reglas(sub, cfg["minimo"], plan["formato"])
         sel["formato"], sel["titulo"], sel["producto"] = plan["formato"], titulo, plan.get("producto")
+        sel["archivos_plan"] = plan["archivos"]
         slug = re.sub(r"[^a-z0-9]+", "_", (plan.get("producto") or "").lower()).strip("_")
         sel["nombre"] = f"{prefijo}_{plan['formato']}_{slug + '_' if slug else ''}{plan['n']:02d}"
         prod, f = plan.get("producto"), FORMATOS[plan["formato"]]
         if prod and not sel.get("gancho") and f.get("gancho_prod"):  # reglas: gancho y promesa con el modelo
-            sel["gancho"] = f["gancho_prod"].format(p=prod)
+            sel["gancho"] = f["gancho_prod"].format(p=nombre_corto(prod))
             pr = precio_de(prod, cfg.get("catalogo", []))
-            sel.setdefault("promesa", f"{prod} · ${pr:g} ↓" if isinstance(pr, (int, float)) else f["promesa"])
+            sel.setdefault("promesa", f"{nombre_corto(prod)} · ${pr:g} ↓" if isinstance(pr, (int, float)) else f["promesa"])
         sel = validar(sel, datos, set(plan["archivos"]))
         if not sel["clips"]:  # el modelo devolvió algo inservible: reglas
             sel.update(validar(dict(guion_por_reglas(sub, cfg["minimo"], plan["formato"]), formato=plan["formato"]),
                                datos, set(plan["archivos"])))
+        if cfg.get("voz_en_off", True) and not sel.get("narracion"):  # reglas (o el modelo falló): voz en off básica
+            plantilla = NARR_REGLAS.get(plan["formato"], {})
+            pr = precio_de(prod, cfg.get("catalogo", [])) if prod else None
+            sel["narracion"] = [{"clip": i, "en": 0.3, "texto": plantilla[c["paso"]].format(
+                p=nombre_corto(prod) or "este modelo", pr=f"{pr:g} dólares" if isinstance(pr, (int, float)) else "buen precio")}
+                for i, c in enumerate(sel.get("clips", [])) if c.get("paso") in plantilla]
+        revisar(sel, datos, set(plan["archivos"]), cfg, log, titulo)
         with lock:
             hechos[0] += 1
         log("progreso", (hechos[0], len(planes)))
@@ -669,11 +858,29 @@ def hacer_serie(carpeta, cfg, log):
         videos = list(ex.map(uno, planes))
     videos = [v for v in videos if v["clips"]]
     for v in videos:
-        dur = sum(c["segundos"] for c in v["clips"])
-        if dur < 20:
-            avisos.append(f"{v['titulo']}: quedó de {dur:.0f} s; le falta material (revísalo o quítalo).")
+        r = v.get("revision", {})
+        if r.get("veredicto") == "descartar":
+            avisos.append(f"{v['titulo']}: el crítico lo descarta ({r.get('puntaje', 0):.0f}/10). "
+                          + (r["problemas"][0] if r.get("problemas") else "") + " Quítalo o graba más material.")
             log("error", avisos[-1])
+    videos.sort(key=lambda v: -float(v.get("revision", {}).get("puntaje", 0)))  # los mejores primero
     serie = {"videos": videos, "avisos": avisos}
+    guardar_serie(carpeta, serie)
+    return serie
+
+
+def revisar_serie(carpeta, cfg, log):
+    """Vuelve a pasar el crítico por todos los reels (por ejemplo, después de editarlos a mano)."""
+    datos = aplicar_etiquetas(json.load(open(os.path.join(carpeta, "analisis.json"), encoding="utf-8")),
+                              leer_etiquetas(carpeta), cfg.get("catalogo", []))
+    serie = leer_serie(carpeta, cfg.get("nombre", "reel_auto_01"))
+    if not serie or not serie.get("videos"):
+        raise RuntimeError("No hay guiones que revisar.")
+    for k, v in enumerate(serie["videos"]):
+        log("progreso", (k, len(serie["videos"])))
+        permitidos = {c["archivo"] for c in v["clips"]} | set(v.get("archivos_plan", []))
+        revisar(v, datos, permitidos, cfg, log, v.get("titulo", f"Reel {k + 1}"))
+    log("progreso", (len(serie["videos"]), len(serie["videos"])))
     guardar_serie(carpeta, serie)
     return serie
 
@@ -786,6 +993,33 @@ def png_cta(dest):
 
 
 # ---------------------------------------------------------------- 3. CapCut
+def dimensiones(path):
+    """Ancho y alto como se VEN (respeta la rotación del teléfono)."""
+    if path.lower().endswith(FOTO_EXT):
+        from PIL import Image, ImageOps
+        with Image.open(path) as im:
+            return ImageOps.exif_transpose(im).size
+    out = run(["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries",
+               "stream=width,height:stream_tags=rotate:stream_side_data=rotation", "-of", "json", path], text=True).stdout
+    st = (json.loads(out or "{}").get("streams") or [{}])[0]
+    w, h = st.get("width", 1080), st.get("height", 1920)
+    rot = abs(int(float((st.get("tags") or {}).get("rotate", 0) or
+                        next((x.get("rotation", 0) for x in st.get("side_data_list", []) if "rotation" in x), 0))))
+    return (h, w) if rot % 180 == 90 else (w, h)
+
+
+def encuadre(path):
+    """Cuánto ampliar para llenar el 9:16 sin bandas negras. Si habría que recortar demasiado (video horizontal),
+    devuelve None y se usa fondo desenfocado."""
+    try:
+        w, h = dimensiones(path)
+    except Exception:
+        return 1.0
+    fit, cover = min(1080 / w, 1920 / h), max(1080 / w, 1920 / h)
+    f = cover / fit
+    return round(f, 3) if f <= 1.6 else None
+
+
 def armar(carpeta, nombre, cfg, log):
     """Modo clásico: un borrador desde seleccion.json."""
     sel = json.load(open(os.path.join(carpeta, "seleccion.json"), encoding="utf-8"))
@@ -828,16 +1062,26 @@ def armar_sel(carpeta, sel, nombre, cfg, log):
         script.add_segment(seg, pista)
 
     inicio, t, paso_visto = [], 0.0, set()
-    for c in sel["clips"]:
+    voz = cfg.get("voz_en_off", True)
+    narrados = {int(n["clip"]) for n in sel.get("narracion", [])}
+    for i_clip, c in enumerate(sel["clips"]):
         path = os.path.join(carpeta, c["archivo"])
         if c["foto"]:
             path = foto_compatible(path)
+        esc = encuadre(path)  # llenar el 9:16: nada de bandas negras
+        if c["foto"]:
             seg = cc.VideoSegment(path, trange_seconds(t, duration=c["segundos"]))
-            seg.add_keyframe(cc.KeyframeProperty.uniform_scale, tim(0), 1.0)  # zoom lento: nada de fotos quietas
-            seg.add_keyframe(cc.KeyframeProperty.uniform_scale, tim(f"{c['segundos']}s"), 1.15)
+            base = esc or 1.0
+            seg.add_keyframe(cc.KeyframeProperty.uniform_scale, tim(0), base)  # zoom lento: nada de fotos quietas
+            seg.add_keyframe(cc.KeyframeProperty.uniform_scale, tim(f"{c['segundos']}s"), round(base * 1.15, 3))
         else:
-            seg = cc.VideoSegment(path, trange_seconds(t, duration=c["segundos"]), volume=cfg["vol_clips"],
-                                  source_timerange=trange_seconds(c["desde"], duration=c["segundos"]))
+            # voz en off: el sonido original solo queda donde alguien dice algo clave (clip marcado «audio»)
+            vol = cfg["vol_clips"] if (c.get("audio") or not voz or i_clip not in narrados) else 0.0
+            seg = cc.VideoSegment(path, trange_seconds(t, duration=c["segundos"]), volume=vol,
+                                  source_timerange=trange_seconds(c["desde"], duration=c["segundos"]),
+                                  clip_settings=cc.ClipSettings(scale_x=esc, scale_y=esc) if esc and esc != 1.0 else None)
+        if esc is None:
+            seg.add_background_filling("blur", 0.375)
         script.add_segment(seg, "video")
         inicio.append(t)
         t += c["segundos"]
