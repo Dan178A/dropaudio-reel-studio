@@ -177,7 +177,7 @@ summary::after{content:"＋";color:var(--gold)}details[open] summary::after{cont
 @media (max-width:1100px){.etq-top{grid-template-columns:1fr}}
 .etq-box{border:1px solid var(--line);border-radius:var(--r);background:var(--card);padding:14px;display:grid;gap:10px;align-content:start}
 .etq-box h4{margin:0;font:700 15px/1.2 var(--f-title)}.etq-box h4 small{font:500 12px var(--f-text);color:var(--muted);margin-left:6px}
-.cat{display:grid;gap:6px}.catrow{display:grid;grid-template-columns:1fr 90px 34px;gap:6px;align-items:center}
+.cat{display:grid;gap:6px;max-height:300px;overflow:auto;padding-right:4px}.catrow{display:grid;grid-template-columns:1fr 90px 34px;gap:6px;align-items:center}
 .grid.etq .toma .body{gap:6px}.grid.etq select{min-height:34px;padding:5px 30px 5px 9px;font-size:12.5px;background-position:calc(100% - 15px) 14px,calc(100% - 10px) 14px}
 .grid.etq .thumb{aspect-ratio:9/10;cursor:pointer}
 .pick{position:absolute;left:8px;top:8px;width:22px;height:22px;accent-color:var(--gold)}
@@ -670,7 +670,8 @@ function renderEtiq(){
           <input type="text" aria-label="Producto" data-cat="${i}" data-cf="nombre" value="${esc(c.nombre)}">
           <input type="number" aria-label="Precio en dólares" min="0" step="0.5" data-cat="${i}" data-cf="precio" value="${c.precio ?? ""}" placeholder="$">
           <button class="iconbtn" aria-label="Quitar ${esc(c.nombre)}" data-catdel="${i}"><svg width="14" height="14"><use href="#i-x"/></svg></button></div>`).join("") || `<p class="help">Agrega tus modelos (ej. KZ Castor · 25). Así la IA no mezcla modelos ni inventa precios.</p>`}</div>
-        <button class="btn ghost sm" id="catAdd"><svg width="14" height="14"><use href="#i-plus"/></svg>Producto</button>
+        <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn ghost sm" id="catAdd"><svg width="14" height="14"><use href="#i-plus"/></svg>Producto</button>
+        <button class="btn ghost sm" id="catImp"><svg width="14" height="14"><use href="#i-refresh"/></svg>Traer de la tienda</button></div>
       </div>
       <div class="etq-box">
         <h4>Aplicar a <b id="nSel">${S.sel.size}</b> seleccionados</h4>
@@ -729,6 +730,13 @@ $("#pan-e").addEventListener("change", e => {
 $("#pan-e").addEventListener("click", e => {
   const b = e.target.closest("button"); if (!b) return;
   if (b.id === "catAdd"){ S.cfg.catalogo = [...(S.cfg.catalogo||[]), {nombre:"", precio:null}]; S.catLocal = S.cfg.catalogo; S.catPend = true; renderEtiq(); $(`[data-cat="${S.cfg.catalogo.length-1}"]`)?.focus(); return; }
+  if (b.id === "catImp"){
+    api("/api/catalogo/importar", {}).then(r => {
+      if (!r.hay_archivo){ toast("No encontré productos.json junto a la app.", true); return; }
+      S.cfg.catalogo = r.catalogo; renderEtiq();
+      toast(r.nuevos || r.cambiados ? `Catálogo al día: ${r.nuevos} nuevos, ${r.cambiados} precios corregidos.` : "El catálogo ya estaba al día.");
+    }); return;
+  }
   if (b.dataset.catdel){ S.cfg.catalogo.splice(+b.dataset.catdel, 1); renderEtiq(); guardarCatalogo(); return; }
   if (b.dataset.ef){ S.efil = b.dataset.ef; renderEtiq(); return; }
   if (b.dataset.selall){ const vis = [...document.querySelectorAll("#pan-e [data-pick]")].map(x => x.dataset.pick);
@@ -757,13 +765,18 @@ function pintarVisor(){
   $("#vTit").textContent = `${f.archivo}  ·  ${PV.i+1}/${S.lista.length}`;
   $("#vMedia").innerHTML = f.foto
     ? `<img src="/media?f=${encodeURIComponent(f.archivo)}" alt="${esc(f.archivo)}">`
-    : `<video id="vVid" src="/media?f=${encodeURIComponent(f.archivo)}" controls autoplay playsinline></video><p class="vmsg" id="vMsg" hidden></p>`;
+    : `<video id="vVid" src="/media?f=${encodeURIComponent(f.archivo)}" controls autoplay playsinline></video><p class="vmsg" id="vMsg">Cargando… ${/\.mov$/i.test(f.archivo) ? "Los videos del iPhone se convierten la primera vez (puede tardar un minuto si es largo)." : ""}</p>`;
   const v = $("#vVid");
-  if (v) v.onerror = () => {               // HEVC u otro formato que el visor no lee: copia liviana
-    if (PV.proxy) { $("#vMsg").hidden = false; $("#vMsg").textContent = "No pude reproducir este video."; return; }
-    PV.proxy = true; $("#vMsg").hidden = false; $("#vMsg").textContent = "Preparando una copia para verlo aquí…";
-    v.src = `/media?f=${encodeURIComponent(f.archivo)}&proxy=1`; v.oncanplay = () => { $("#vMsg").hidden = true; };
-  };
+  if (v){
+    const copia = () => {                  // formato que el visor no lee: copia liviana H.264
+      if (PV.proxy) { $("#vMsg").hidden = false; $("#vMsg").textContent = "No pude reproducir este video."; return; }
+      PV.proxy = true; $("#vMsg").hidden = false; $("#vMsg").textContent = "Preparando una copia para verlo aquí…";
+      v.src = `/media?f=${encodeURIComponent(f.archivo)}&proxy=1`;
+    };
+    v.onerror = copia;
+    v.onloadedmetadata = () => { if (!v.videoWidth) copia(); };  // solo audio = no decodifica la imagen
+    v.onloadeddata = () => { if (v.videoWidth) $("#vMsg").hidden = true; };
+  }
   $("#vTipo").innerHTML = tipoOpts(e.tipo || ""); $("#vProd").innerHTML = prodOpts(e.producto || "");
   $("#vNota").value = e.nota || ""; $("#vMarcaTxt").value = ""; $("#vMarcaBtn").hidden = !!f.foto; $("#vMarcaTxt").hidden = !!f.foto;
   pintarMarcas();

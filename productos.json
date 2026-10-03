@@ -1,0 +1,125 @@
+{
+ "origen": "DropAudio CCS landing: composables/fallbackData.ts (precios revisados con docs/CONTEXTO_DROPAUDIO.md, 29/9/2026)",
+ "productos": [
+  {
+   "nombre": "KZ EDX Pro X",
+   "precio": 13.0,
+   "categoria": "iem",
+   "stock": 12
+  },
+  {
+   "nombre": "KZ EDX Pro 2 (3.5mm)",
+   "precio": 18.0,
+   "categoria": "iem",
+   "stock": 5
+  },
+  {
+   "nombre": "KZ EDX Pro 2 (Type-C)",
+   "precio": 20.0,
+   "categoria": "iem",
+   "stock": 5
+  },
+  {
+   "nombre": "KZ Libra (High Res)",
+   "precio": 18.0,
+   "categoria": "iem",
+   "stock": 7
+  },
+  {
+   "nombre": "KZ Castor (Harman)",
+   "precio": 25.0,
+   "categoria": "iem",
+   "stock": 0
+  },
+  {
+   "nombre": "KZ Castor (Bass)",
+   "precio": 25.0,
+   "categoria": "iem",
+   "stock": 10
+  },
+  {
+   "nombre": "KZ Castor Pro (Harman)",
+   "precio": 28.0,
+   "categoria": "iem",
+   "stock": 10
+  },
+  {
+   "nombre": "KZ Castor Pro (Bass)",
+   "precio": 28.0,
+   "categoria": "iem",
+   "stock": 10
+  },
+  {
+   "nombre": "KZ ZSN PRO 2",
+   "precio": 30.0,
+   "categoria": "iem",
+   "stock": 0
+  },
+  {
+   "nombre": "KZ Saga (Bass)",
+   "precio": 23.0,
+   "categoria": "iem",
+   "stock": 5
+  },
+  {
+   "nombre": "KZ ZS10 PRO 2",
+   "precio": 45.0,
+   "categoria": "iem",
+   "stock": 5
+  },
+  {
+   "nombre": "KZ Sora (Bluetooth)",
+   "precio": 30.0,
+   "categoria": "wireless",
+   "stock": 1
+  },
+  {
+   "nombre": "KZ AE01 (Adaptador BT)",
+   "precio": 35.0,
+   "categoria": "wireless",
+   "stock": 10
+  },
+  {
+   "nombre": "KZ AM01 DAC",
+   "precio": 15.0,
+   "categoria": "dac",
+   "stock": 10
+  },
+  {
+   "nombre": "KZ AM02 DAC",
+   "precio": 18.0,
+   "categoria": "dac",
+   "stock": 10
+  },
+  {
+   "nombre": "KZ M2 Dual-Mic (Type-C)",
+   "precio": 18.0,
+   "categoria": "dac",
+   "stock": 10
+  },
+  {
+   "nombre": "Estuche Oval KZ",
+   "precio": 5.0,
+   "categoria": "accesorio",
+   "stock": 40
+  },
+  {
+   "nombre": "Cable Silver Upgrade",
+   "precio": 8.0,
+   "categoria": "accesorio",
+   "stock": 10
+  },
+  {
+   "nombre": "Cable DAC Type-C",
+   "precio": 15.0,
+   "categoria": "accesorio",
+   "stock": 8
+  },
+  {
+   "nombre": "Intercomunicador Y12 Pro",
+   "precio": 25.0,
+   "categoria": "intercom",
+   "stock": 10
+  }
+ ]
+}

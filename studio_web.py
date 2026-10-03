@@ -25,6 +25,32 @@ CFG = {"carpeta": os.path.join(AQUI, "Videos Dropaudioccs"), "vision": "gemma3:4
 if os.path.exists(CFG_FILE):
     CFG.update(json.load(open(CFG_FILE, encoding="utf-8")))
 
+
+def productos_tienda():
+    """productos.json (modelos y precios sacados de la landing de DropAudio). Primero el que está junto a la app."""
+    for base in (BASE, RES):
+        p = os.path.join(base, "productos.json")
+        if os.path.exists(p):
+            return json.load(open(p, encoding="utf-8")).get("productos", [])
+    return []
+
+
+def importar_productos(actualizar_precios=False):
+    """Suma al catálogo los productos de la tienda que falten. Con actualizar_precios, también corrige precios."""
+    cat, nuevos, cambiados = list(CFG.get("catalogo") or []), 0, 0
+    for p in productos_tienda():
+        ya = next((c for c in cat if c["nombre"].lower() == p["nombre"].lower()), None)
+        if not ya:
+            cat.append({"nombre": p["nombre"], "precio": p.get("precio")}); nuevos += 1
+        elif actualizar_precios and p.get("precio") is not None and ya.get("precio") != p["precio"]:
+            ya["precio"] = p["precio"]; cambiados += 1
+    CFG["catalogo"] = cat
+    return nuevos, cambiados
+
+
+if importar_productos()[0]:  # la primera vez (o si la tienda tiene modelos nuevos) se cargan solos
+    json.dump(CFG, open(CFG_FILE, "w", encoding="utf-8"), ensure_ascii=False, indent=1)
+
 LOCK = threading.Lock()
 JOB = {"tarea": None, "corriendo": False, "hecho": 0, "total": 0, "mensaje": "", "ok": None, "inicio": 0, "fin": 0}
 LOG, ESTADO = [], {"analisis_v": 0, "guion_v": 0, "etiq_v": 0, "modelos": [], "borrador": None}
@@ -57,10 +83,34 @@ def leer(nombre):
     return json.load(open(p, encoding="utf-8")) if os.path.exists(p) else None
 
 
+_previas = set()
+
+
+def preparar_copias(carpeta):
+    """En segundo plano, una vez por carpeta: copias H.264 de los videos HEVC para que el reproductor abra al instante."""
+    if carpeta in _previas:
+        return
+    _previas.add(carpeta)
+
+    def trabajar():
+        for f in sorted(os.listdir(carpeta)):
+            if CFG["carpeta"] != carpeta:
+                return  # cambiaste de carpeta
+            src = os.path.join(carpeta, f)
+            if f.lower().endswith(core.VIDEO_EXT):
+                try:
+                    if es_hevc(src):
+                        archivo_media(f, proxy=True)
+                except Exception:
+                    pass
+    threading.Thread(target=trabajar, daemon=True).start()
+
+
 def lista_archivos():
     c = CFG["carpeta"]
     if not os.path.isdir(c):
         return []
+    preparar_copias(c)
     return [{"archivo": f, "foto": f.lower().endswith(core.FOTO_EXT)} for f in sorted(os.listdir(c))
             if f.lower().endswith(core.VIDEO_EXT + core.FOTO_EXT)]
 
@@ -135,6 +185,13 @@ def miniatura(nombre, t):
     cache = os.path.join(CFG["carpeta"], "_reel_studio", "thumbs")
     os.makedirs(cache, exist_ok=True)
     dest = os.path.join(cache, hashlib.md5(f"{nombre}@{t}".encode()).hexdigest() + ".jpg")
+    if not os.path.exists(dest) and not nombre.lower().endswith(core.FOTO_EXT):
+        try:  # clips más cortos que el segundo pedido (p. ej. 0,5 s): tomar la mitad del clip
+            dur = core.duracion(src)
+            if t >= dur:
+                t = dur / 2
+        except Exception:
+            pass
     if not os.path.exists(dest):
         if nombre.lower().endswith(core.FOTO_EXT):
             from PIL import Image, ImageOps
@@ -153,6 +210,18 @@ TIPOS_MIME = {".mp4": "video/mp4", ".m4v": "video/mp4", ".mov": "video/quicktime
 _proxy_lock = threading.Lock()
 
 
+_codecs = {}
+
+
+def es_hevc(path):
+    """Los videos del iPhone vienen en HEVC: el visor de Windows suele dar solo el audio."""
+    if path not in _codecs:
+        out = core.run(["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=codec_name",
+                        "-of", "csv=p=0", path], text=True).stdout.strip().lower()
+        _codecs[path] = out in ("hevc", "h265")
+    return _codecs[path]
+
+
 def archivo_media(nombre, proxy=False):
     """Ruta servible del archivo. Fotos HEIC -> JPG. Con proxy=True crea (una vez) una copia H.264 liviana
     para videos que el visor no reproduce (p. ej. HEVC del iPhone)."""
@@ -162,7 +231,7 @@ def archivo_media(nombre, proxy=False):
         return None
     if nombre.lower().endswith(core.FOTO_EXT):
         return core.foto_compatible(src)
-    if not proxy:
+    if not proxy and not es_hevc(src):
         return src
     cache = os.path.join(CFG["carpeta"], "_reel_studio", "preview"); os.makedirs(cache, exist_ok=True)
     dest = os.path.join(cache, os.path.splitext(nombre)[0] + ".mp4")
@@ -170,7 +239,8 @@ def archivo_media(nombre, proxy=False):
         if not os.path.exists(dest):
             tmp = dest + ".tmp.mp4"
             core.run(["ffmpeg", "-v", "error", "-y", "-i", src, "-vf", "scale=-2:720", "-c:v", "libx264",
-                      "-preset", "veryfast", "-crf", "28", "-c:a", "aac", "-b:a", "96k", "-movflags", "+faststart", tmp])
+                      "-preset", "ultrafast", "-crf", "28", "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "96k",
+                      "-movflags", "+faststart", tmp])
             if os.path.exists(tmp):
                 os.replace(tmp, dest)
     return dest if os.path.exists(dest) else None
@@ -304,6 +374,11 @@ class H(BaseHTTPRequestHandler):
                 etiq = core.guardar_etiquetas(CFG["carpeta"], etiq)
                 ESTADO["etiq_v"] += 1; ESTADO["analisis_v"] += 1
                 self._json({"ok": True, "etiquetas": etiq})
+            elif u.path == "/api/catalogo/importar":  # vuelve a leer productos.json (modelos y precios de la tienda)
+                nuevos, cambiados = importar_productos(actualizar_precios=True); guardar_cfg()
+                ESTADO["etiq_v"] += 1; ESTADO["analisis_v"] += 1
+                self._json({"ok": True, "catalogo": CFG["catalogo"], "nuevos": nuevos, "cambiados": cambiados,
+                            "hay_archivo": bool(productos_tienda())})
             elif u.path == "/api/catalogo":  # [{"nombre": "KZ Castor", "precio": 25}]
                 cat = []
                 for p in self._body().get("catalogo", []):
