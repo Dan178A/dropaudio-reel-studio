@@ -569,6 +569,14 @@ function criticaHTML(r){
     ${r.corregido && (r.problemas||[]).length ? `<details><summary>Lo que vio antes de corregir</summary><ul>${r.problemas.map(x=>`<li>${esc(x)}</li>`).join("")}</ul></details>` : ""}
   </div>`;
 }
+function vozHTML(){
+  if (!S.cfg.voz_en_off) return "";
+  const hueco = G.clips.filter(c => !c.audio).reduce((s,c)=>s+(+c.segundos||0),0) || 1;
+  const pal = G.clips.reduce((n,c)=>n+c.narr.reduce((m,x)=>m+(x.texto||"").trim().split(/\s+/).filter(Boolean).length,0),0);
+  const cob = Math.min(100, Math.round(pal/2.4/hueco*100)), ok = cob >= 70;
+  return `<div class="durbox ${ok?"ok":"warn"}" style="margin-top:6px"><svg width="16" height="16"><use href="#i-mic"/></svg>Voz en off: ${pal} palabras · cubre ~${cob} %</div>
+    ${ok ? "" : `<button class="btn ghost sm" id="gVoz" style="margin-top:6px">Completar la voz en off</button>`}`;
+}
 function cargarReel(i){
   const vs = videos(); S.vi = Math.max(0, Math.min(i, vs.length - 1));
   G = vs.length ? toUI(vs[S.vi]) : null; PASOS = pasosDe(G?.formato || "asi_compras");
@@ -597,7 +605,8 @@ function renderGuion(){
         <div class="field"><label for="gP">Promesa debajo del gancho</label><input type="text" id="gP" value="${esc(G.promesa)}" maxlength="50"></div>
       </div>
       <div><div class="field"><label>Así se verá</label><div class="hookprev" id="hookPrev">${esc(G.gancho)}</div></div>
-        <div class="durbox ${ok?"ok":"warn"}"><svg width="16" height="16"><use href="#i-${ok?"check":"x"}"/></svg>${fmt(total)} ${ok?"· duración ideal":"· apunta a 30–45 s"}</div></div>
+        <div class="durbox ${ok?"ok":"warn"}"><svg width="16" height="16"><use href="#i-${ok?"check":"x"}"/></svg>${fmt(total)} ${ok?"· duración ideal":"· apunta a 30–45 s"}</div>
+        ${vozHTML()}</div>
     </div>
     <div class="timeline" aria-hidden="true">${G.clips.map((c,i)=>`<div data-go="${i}" style="flex:${Math.max(+c.segundos,0.5)};background:${(PASOS[c.paso]||["","#6F675B"])[1]}" title="${esc(c.archivo)}">${esc((PASOS[c.paso]||[c.paso])[0])}</div>`).join("")}</div>
     <div class="ruler"><span>0 s</span><span>${fmt(total/2)}</span><span>${fmt(total)}</span></div>
@@ -621,6 +630,7 @@ function renderGuion(){
               <input type="text" aria-label="Texto de la narración" data-i="${i}" data-j="${j}" data-n="texto" value="${esc(n.texto)}">
               <button class="iconbtn" aria-label="Quitar narración" data-del-n="${i}:${j}"><svg width="15" height="15"><use href="#i-x"/></svg></button></div>`).join("")}
             <button class="btn ghost sm" data-add-n="${i}" style="justify-self:start"><svg width="14" height="14"><use href="#i-plus"/></svg>Narración (voz Nandez)</button>
+            ${c.audio ? "" : `<small class="help">Para cubrir este clip: ~${Math.round((+c.segundos||0)*2.4)} palabras</small>`}
           </div>
         </div>
         <div class="acts">
@@ -645,6 +655,12 @@ $("#pan-g").addEventListener("change", e => { if (e.target.dataset.c) { guardar(
 $("#pan-g").addEventListener("click", e => {
   const r = e.target.closest("[data-reel]");
   if (r){ if (G) guardar(true); cargarReel(+r.dataset.reel); renderGuion(); return; }
+  if (e.target.closest("#gVoz")){
+    (async () => { S.guion.videos[S.vi] = {...S.guion.videos[S.vi], ...fromUI(G)}; await api("/api/guion", S.guion);
+      const r = await api("/api/completar_voz", {i: S.vi});
+      if (r.ok){ S.guion = r.guion; S.gv = r.guion_v; cargarReel(S.vi); renderGuion(); toast("Rellené los huecos de la voz en off. Revísala y edítala a tu gusto."); } })();
+    return;
+  }
   if (e.target.closest("#gRev")){
     (async () => { if (G) { S.guion.videos[S.vi] = {...S.guion.videos[S.vi], ...fromUI(G)}; await api("/api/guion", S.guion); }
       const r = await api("/api/tarea/revisar", {}); if (!r.ok) toast("Ya hay una tarea en curso.", true); poll(); })();

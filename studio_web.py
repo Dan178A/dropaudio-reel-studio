@@ -403,6 +403,14 @@ class H(BaseHTTPRequestHandler):
                 CFG["catalogo"] = cat; guardar_cfg()
                 ESTADO["etiq_v"] += 1; ESTADO["analisis_v"] += 1
                 self._json({"ok": True, "catalogo": cat})
+            elif u.path == "/api/completar_voz":  # {"i": n}: rellena los huecos de voz en off de ese reel
+                i = int(self._body().get("i", 0))
+                serie = core.leer_serie(CFG["carpeta"], CFG.get("nombre", "reel_auto_01"))
+                v = serie["videos"][i]; prod = v.get("producto")
+                info = next((x for x in productos_tienda() if prod and x["nombre"].lower() == prod.lower()), None)
+                core.completar_voz(v, v.get("formato", "asi_compras"), prod, core.precio_de(prod, CFG["catalogo"]), info)
+                core.guardar_serie(CFG["carpeta"], serie); ESTADO["guion_v"] += 1
+                self._json({"ok": True, "guion": serie, "guion_v": ESTADO["guion_v"]})
             elif u.path == "/api/guion":  # recibe la serie completa {"videos": [...]}
                 serie = self._body()
                 datos = leer("analisis.json") or {}
