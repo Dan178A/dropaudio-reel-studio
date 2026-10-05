@@ -42,3 +42,6 @@ escenas/**/.hyperframes/
 escenas/*/fonts/
 escenas/*/vendor/
 escenas/*/productos/
+
+# Caché de fuentes descargadas en tiempo de ejecución (solo la raíz)
+/fonts/

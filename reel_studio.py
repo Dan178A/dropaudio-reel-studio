@@ -1343,16 +1343,17 @@ def armar_sel(carpeta, sel, nombre, cfg, log):
         t += c["segundos"]
 
     # Gancho (primer clip), chip de cada paso (primer clip del paso) y CTA (último clip)
-    png_gancho(sel["gancho"], sel.get("promesa", ""), g := os.path.join(out, "gancho.png"))
     if not es_escena(sel["clips"][0]):
+        png_gancho(sel["gancho"], sel.get("promesa", ""), g := os.path.join(out, "gancho.png"))
         overlay(g, 0, min(4.0, sel["clips"][0]["segundos"]))
     cues = []
     for i, c in enumerate(sel["clips"]):
         p = c.get("paso", "")
-        if p in fmt["pasos"] and p not in paso_visto and i > 0 and not es_escena(c):
-            paso_visto.add(p)
-            png_paso(p, fmt["pasos"][p], png := os.path.join(out, f"paso{p}.png"), fmt["kicker"])
-            overlay(png, inicio[i], min(3.5, c["segundos"]))
+        if p in fmt["pasos"] and p not in paso_visto and i > 0:
+            paso_visto.add(p)  # una escena que abre el paso lo consume: no hay chip, ni tarde en otro clip
+            if not es_escena(c):
+                png_paso(p, fmt["pasos"][p], png := os.path.join(out, f"paso{p}.png"), fmt["kicker"])
+                overlay(png, inicio[i], min(3.5, c["segundos"]))
             cues.append(inicio[i])
     ult = sel["clips"][-1]["segundos"]
     cta_ini = t - min(ult, 4.0)

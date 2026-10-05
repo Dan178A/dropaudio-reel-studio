@@ -101,3 +101,56 @@ def test_sin_cta_png_si_la_ultima_es_escena_cta(entorno, monkeypatch):
     assert pedidos == []
     rs.armar_sel(str(carpeta), _sel("precio"), "t_cta2", cfg, lambda k, x: None)
     assert len(pedidos) == 1
+
+
+def _pistas(d):
+    ids = {m["id"]: m for m in d["materials"]["videos"]}
+    return [(tr.get("name") or tr["type"], [(ids.get(sg["material_id"], {}).get("path", ""), sg["volume"],
+                                              sg["target_timerange"]["start"]) for sg in tr["segments"]])
+            for tr in d["tracks"] if tr["type"] == "video"]
+
+
+def test_escena_consume_el_paso_y_no_hay_chip_tardio(entorno):
+    carpeta, drafts, cfg, llamadas, pasos, _ = entorno
+    sel = _sel("precio")
+    sel["clips"].append(dict(sel["clips"][0], paso="5"))
+    sel["narracion"] = []
+    rs.armar_sel(str(carpeta), sel, "t_consumo", cfg, lambda k, x: None)
+    assert "5" not in pasos
+
+
+def test_escena_en_orden_con_volumen_cero(entorno):
+    carpeta, drafts, cfg, llamadas, pasos, escena_mp4 = entorno
+    rs.armar_sel(str(carpeta), _sel("precio"), "t_orden", cfg, lambda k, x: None)
+    video = next(segs for nom, segs in _pistas(_contenido(drafts, "t_orden")) if nom == "video" or nom == "")
+    assert [os.path.basename(r) for r, _, _ in video] == ["real.mp4", os.path.basename(escena_mp4)]
+    assert video[1][1] == 0 and video[1][2] == 4_000_000
+
+
+def test_fallida_reubica_narracion_y_no_referencia_su_mp4(entorno, tmp_path, monkeypatch):
+    carpeta, drafts, cfg, llamadas, pasos, escena_mp4 = entorno
+    otro = _mp4(str(tmp_path / "fallida.mp4"), 3)
+    base = escenas.render
+    monkeypatch.setattr(escenas, "render", lambda t, d, c, dur=None: otro if t == "tres_datos" else base(t, d, c, dur))
+    sel = _sel("falla", "precio")
+    sel["narracion"] = [{"clip": 0, "texto": "uno", "en": 0.5}, {"clip": 1, "texto": "dos", "en": 0.5},
+                        {"clip": 2, "texto": "tres", "en": 0.5}]
+    rs.armar_sel(str(carpeta), sel, "t_remap", cfg, lambda k, x: None)
+    d = _contenido(drafts, "t_remap")
+    textos = {m["id"]: json.loads(m["content"])["text"] for m in d["materials"]["texts"]}
+    voz = next(tr for tr in d["tracks"] if tr["type"] == "text")
+    assert [(textos[sg["material_id"]], sg["target_timerange"]["start"]) for sg in voz["segments"]] == [
+        ("uno", 500_000), ("tres", 4_500_000)]
+    assert not any("fallida.mp4" in m.get("path", "") for m in d["materials"]["videos"])
+
+
+def test_primer_clip_escena_sin_gancho(entorno, monkeypatch):
+    carpeta, drafts, cfg, *_ = entorno
+    pedidos = []
+    original = rs.png_gancho
+    monkeypatch.setattr(rs, "png_gancho", lambda *a: (pedidos.append(a), original(*a))[1])
+    sel = _sel("precio")
+    sel["clips"].reverse()
+    sel["narracion"] = []
+    rs.armar_sel(str(carpeta), sel, "t_g", cfg, lambda k, x: None)
+    assert pedidos == []
