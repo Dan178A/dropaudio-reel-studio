@@ -12,6 +12,7 @@ from urllib.parse import urlparse, parse_qs
 import reel_studio as core
 import actualizador
 import rutas
+import ollama_catalogo
 import version
 
 PUERTO = 8765
@@ -166,6 +167,16 @@ def t_actualizar():
     return actualizador.aplicar(prog)
 
 
+def t_descargar_modelo(modelo):
+    def prog(hecho, total, estado):
+        with LOCK:
+            JOB["hecho"], JOB["total"] = hecho, total
+            JOB["mensaje"] = f"{modelo}: {estado}" + (f" ({hecho * 100 // total}%)" if total else "")
+    msg = ollama_catalogo.descargar(modelo, prog)
+    ESTADO["modelos"] = core.modelos()
+    return msg
+
+
 def chequear_update():
     """Una sola consulta de versión nueva, 5 s después de arrancar (nunca rompe la app)."""
     time.sleep(5)
@@ -300,6 +311,8 @@ class H(BaseHTTPRequestHandler):
             b = open(os.path.join(RES, "studio.html"), "rb").read()
             self.send_response(200); self.send_header("Content-Type", "text/html; charset=utf-8")
             self.send_header("Cache-Control", "no-store"); self.end_headers(); self.wfile.write(b)
+        elif u.path == "/api/ollama/buscar":  # ?q=&c= -> {"fuente": "web"|"lista", "modelos": [...]}
+            self._json(ollama_catalogo.buscar(q.get("q", [""])[0], q.get("c", [""])[0]))
         elif u.path == "/api/estado":
             v = int(q.get("av", ["-1"])[0]); gv = int(q.get("gv", ["-1"])[0]); ev = int(q.get("ev", ["-1"])[0])
             with LOCK:
@@ -386,6 +399,13 @@ class H(BaseHTTPRequestHandler):
                 u_ = ESTADO["update"]
                 ok = bool(u_ and u_.get("nueva")) and lanzar("actualizar", t_actualizar)
                 self._json({"ok": ok}, 200 if ok else 409)
+            elif u.path == "/api/ollama/descargar":  # {"modelo": "gemma3:4b"}
+                modelo = str(self._body().get("modelo", "")).strip()
+                if not ollama_catalogo.nombre_valido(modelo):
+                    self._json({"ok": False, "error": "Nombre de modelo no válido"}, 400)
+                else:
+                    ok = lanzar("descargar_modelo", lambda: t_descargar_modelo(modelo))
+                    self._json({"ok": ok}, 200 if ok else 409)
             elif u.path.startswith("/api/tarea/"):
                 nombre = u.path.rsplit("/", 1)[1]
                 ok = nombre in TAREAS and lanzar(nombre, TAREAS[nombre])

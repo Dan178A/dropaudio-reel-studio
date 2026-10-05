@@ -1,1 +1,14 @@
-{"modelos": []}
+{"modelos": [
+  {"nombre": "gemma3", "descripcion": "Modelo multimodal de Google, rápido y liviano. Buen equilibrio para analizar videos.", "capacidades": ["vision"], "cloud": false, "tamanos": ["1b", "4b", "12b", "27b"], "pulls": ""},
+  {"nombre": "gemma4", "descripcion": "Gemma 4: razonamiento, uso de herramientas y comprensión multimodal.", "capacidades": ["vision", "tools", "thinking", "audio"], "cloud": true, "tamanos": ["e2b", "e4b", "12b", "26b", "31b"], "pulls": ""},
+  {"nombre": "qwen2.5vl", "descripcion": "Visión de Qwen: entiende imágenes, texto en pantalla y escenas.", "capacidades": ["vision"], "cloud": false, "tamanos": ["3b", "7b", "32b", "72b"], "pulls": ""},
+  {"nombre": "llava", "descripcion": "Clásico de visión y lenguaje, ligero y estable.", "capacidades": ["vision"], "cloud": false, "tamanos": ["7b", "13b", "34b"], "pulls": ""},
+  {"nombre": "llama3.2-vision", "descripcion": "Llama con visión: describe y razona sobre imágenes.", "capacidades": ["vision"], "cloud": false, "tamanos": ["11b", "90b"], "pulls": ""},
+  {"nombre": "minicpm-v", "descripcion": "Modelo de visión compacto, eficiente en equipos modestos.", "capacidades": ["vision"], "cloud": false, "tamanos": ["8b"], "pulls": ""},
+  {"nombre": "glm-5.3", "descripcion": "Modelo grande que corre en la nube de Ollama (requiere iniciar sesión).", "capacidades": ["tools", "thinking"], "cloud": true, "tamanos": [], "pulls": ""},
+  {"nombre": "deepseek-v4.1-flash", "descripcion": "DeepSeek rápido en la nube de Ollama (requiere iniciar sesión).", "capacidades": ["tools", "thinking"], "cloud": true, "tamanos": [], "pulls": ""},
+  {"nombre": "qwen3", "descripcion": "Modelo de texto con razonamiento, ideal para guiones.", "capacidades": ["tools", "thinking"], "cloud": false, "tamanos": ["0.6b", "1.7b", "4b", "8b", "14b", "32b"], "pulls": ""},
+  {"nombre": "gpt-oss", "descripcion": "Modelo abierto de OpenAI con razonamiento y herramientas.", "capacidades": ["tools", "thinking"], "cloud": true, "tamanos": ["20b", "120b"], "pulls": ""},
+  {"nombre": "llama3.2", "descripcion": "Llama pequeño y veloz para texto general.", "capacidades": ["tools"], "cloud": false, "tamanos": ["1b", "3b"], "pulls": ""},
+  {"nombre": "nomic-embed-text", "descripcion": "Embeddings de texto para búsqueda semántica.", "capacidades": ["embedding"], "cloud": false, "tamanos": [], "pulls": ""}
+]}
