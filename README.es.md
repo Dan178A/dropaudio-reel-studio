@@ -11,7 +11,7 @@ y arma el borrador 1080×1920 en CapCut, listo para exportar.
 
 **Un reel que me tomaba ~2 horas montar a mano ahora toma ~15 minutos, y la mayor parte sin supervisión.**
 
-[Ver el video en MP4](docs/media/reel-studio-motion.mp4) · [Read me in English](README.md) · [Historia completa del proyecto](reel-studio-capcut-2026-10.md)
+[Ver el video en MP4](docs/media/reel-studio-motion.mp4) · [Read me in English](README.md) · [Historia completa del proyecto](reel-studio-capcut-2026-10.md) · [Documentos de contexto](docs/contexto/README.md)
 
 </div>
 

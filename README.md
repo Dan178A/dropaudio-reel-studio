@@ -11,7 +11,7 @@ writes the script and assembles a 1080×1920 draft in CapCut — ready to export
 
 **A reel that took me ~2 hours to cut by hand now takes ~15 minutes, and most of that is unattended.**
 
-[Watch the MP4](docs/media/reel-studio-motion.mp4) · [Léeme en español](README.es.md) · [Full project history](reel-studio-capcut-2026-10.md)
+[Watch the MP4](docs/media/reel-studio-motion.mp4) · [Léeme en español](README.es.md) · [Full project history](reel-studio-capcut-2026-10.md) · [Project context docs (ES)](docs/contexto/README.md)
 
 ![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?style=flat-square&logo=python&logoColor=white)
 ![Local AI](https://img.shields.io/badge/AI-local%20via%20Ollama-000000?style=flat-square)
