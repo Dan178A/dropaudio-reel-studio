@@ -10,6 +10,7 @@ from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs
 
 import reel_studio as core
+import escenas
 import actualizador
 import rutas
 import ollama_catalogo
@@ -298,6 +299,17 @@ def elegir_carpeta():
     return out.stdout.strip().replace("/", os.sep)
 
 
+_ESC_CACHE = [0.0, None]
+
+
+def estado_escenas():
+    """{"disponible", "motivo"} de las escenas animadas. Un fallo no se cachea en escenas.py (para detectar Node recién
+    instalado), así que aquí se reusa 30 s para no lanzar `node --version` en cada sondeo de la interfaz."""
+    if _ESC_CACHE[1] is None or time.time() - _ESC_CACHE[0] > 30:
+        _ESC_CACHE[0], _ESC_CACHE[1] = time.time(), dict(zip(("disponible", "motivo"), escenas.disponible()))
+    return _ESC_CACHE[1]
+
+
 # ------------------------------------------------------------------ HTTP
 class H(BaseHTTPRequestHandler):
     def _json(self, obj, code=200):
@@ -324,7 +336,7 @@ class H(BaseHTTPRequestHandler):
             out = {"version": version.__version__, "cfg": CFG, "archivos": archivos(), "modelos": ESTADO["modelos"], "job": job, "log": log,
                    "borrador": ESTADO["borrador"], "analisis_v": ESTADO["analisis_v"], "guion_v": ESTADO["guion_v"],
                    "etiq_v": ESTADO["etiq_v"], "update": ESTADO["update"],
-                   "ahora": time.time()}
+                   "ahora": time.time(), "escenas": estado_escenas()}
             if v != ESTADO["analisis_v"]:
                 a = leer("analisis.json")
                 out["analisis"] = core.aplicar_etiquetas(a, core.leer_etiquetas(CFG["carpeta"]), CFG["catalogo"]) if a else a
@@ -337,6 +349,10 @@ class H(BaseHTTPRequestHandler):
                 out["formatos"] = {k: {"titulo": f["titulo"], "kicker": f["kicker"], "pasos": f["pasos"],
                                        "nucleo": f["nucleo"]} for k, f in core.FORMATOS.items()}
                 out["orden_formatos"] = core.ORDEN_FORMATOS
+                try:
+                    out["catalogo_escenas"] = escenas.catalogo()
+                except (OSError, ValueError):
+                    out["catalogo_escenas"] = {}
             self._json(out)
         elif u.path == "/media":  # video/foto para el reproductor, con soporte de Range (para adelantar)
             p = archivo_media(q.get("f", [""])[0], q.get("proxy", ["0"])[0] == "1")
@@ -471,6 +487,12 @@ class H(BaseHTTPRequestHandler):
             elif u.path == "/api/guion":  # recibe la serie completa {"videos": [...]}
                 serie = self._body()
                 datos = leer("analisis.json") or {}
+                for sel in serie.get("videos", []):  # una escena editada que no valida se rechaza (no se descarta en silencio)
+                    for c in sel.get("clips", []):
+                        if core.es_escena(c) and not core.validar_escena_clip(c, CFG.get("catalogo", [])):
+                            return self._json({"ok": False, "error": f"La escena «{c.get('escena')}» no es válida: "
+                                               "revisa que ningún texto esté vacío, que el precio sea el del catálogo de "
+                                               "productos y que el paso sea uno donde encaje esa plantilla."}, 400)
                 for sel in serie.get("videos", []):
                     for c in sel.get("clips", []):
                         if not core.es_escena(c):  # una escena no tiene tramo: su duración sale de sus textos
