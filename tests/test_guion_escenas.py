@@ -300,10 +300,10 @@ def test_hacer_serie_pasa_bandera_y_prompt(tmp_path, monkeypatch, con_escenas):
     assert v["escenas"] is True and v["objetivo"] == 45
 
 
-def test_sin_escenas_reubica_narracion():
+def test_sin_clips_reubica_narracion():
     sel = {"clips": [video("a.mp4", 0, 5, "gancho"), escena("cta", {"linea": "Hola"}, "cta"), video("b.mp4", 0, 5, "4")],
            "narracion": [{"clip": 1, "en": 0.3, "texto": "x"}, {"clip": 2, "en": 0.3, "texto": "y"}]}
-    out = rs.sin_escenas(sel)
+    out = rs.sin_clips(sel, {1})
     assert [c["archivo"] for c in out["clips"]] == ["a.mp4", "b.mp4"]
     assert out["narracion"] == [{"clip": 1, "en": 0.3, "texto": "y"}]
     assert len(sel["clips"]) == 3  # no toca el original

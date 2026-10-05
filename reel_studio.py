@@ -1263,22 +1263,39 @@ def armar_serie(carpeta, cfg, log, cuales=None):
     return hechos
 
 
-def sin_escenas(sel):
-    """Copia del guion sin los clips de escena, con la narración reubicada en los clips que quedan."""
-    quedan = [i for i, c in enumerate(sel.get("clips", [])) if not es_escena(c)]
+def sin_clips(sel, quitar):
+    """Copia del guion sin los clips de índices `quitar`, con la narración reubicada en los clips que quedan."""
+    quedan = [i for i in range(len(sel.get("clips", []))) if i not in quitar]
     mapa = {i: k for k, i in enumerate(quedan)}
     return dict(sel, clips=[sel["clips"][i] for i in quedan],
                 narracion=[dict(n, clip=mapa[int(n["clip"])]) for n in sel.get("narracion", []) if int(n["clip"]) in mapa])
+
+
+def renderizar_escenas(carpeta, sel, nombre, log):
+    """Renderiza las escenas del guion a <carpeta>/_reel_studio/escenas/ y anota la ruta en el clip ("mp4").
+    Una escena que falla se omite con aviso (la narración se reubica) y el reel se arma igual."""
+    idx = [i for i, c in enumerate(sel.get("clips", [])) if es_escena(c)]
+    if not idx:
+        return sel
+    cache = os.path.join(carpeta, "_reel_studio", "escenas")
+    os.makedirs(cache, exist_ok=True)
+    clips, fallidas = list(sel["clips"]), set()
+    for k, i in enumerate(idx):
+        c = clips[i]
+        log("estado", f"«{nombre}»: renderizando escena {k + 1}/{len(idx)} ({c['escena']})…")
+        try:
+            clips[i] = dict(c, mp4=escenas.render(c["escena"], c["datos"], cache, dur=c["segundos"]))
+        except Exception as e:
+            fallidas.add(i)
+            log("error", f"«{nombre}»: la escena «{c['escena']}» falló y se omite: {e}")
+    return sin_clips(dict(sel, clips=clips), fallidas)
 
 
 def armar_sel(carpeta, sel, nombre, cfg, log):
     import pycapcut as cc
     from pycapcut import trange_seconds, tim
 
-    if any(es_escena(c) for c in sel.get("clips", [])):
-        # Provisional: las escenas animadas todavía no se renderizan aquí; se omiten con aviso y el reel se arma igual.
-        log("error", f"«{nombre}»: las escenas animadas aún no se arman en CapCut; se omiten.")
-        sel = sin_escenas(sel)
+    sel = renderizar_escenas(carpeta, sel, nombre, log)
     if not sel.get("clips"):
         raise RuntimeError(f"«{nombre}» no tiene clips.")
     fmt = FORMATOS.get(sel.get("formato"), FORMATOS["asi_compras"])
@@ -1299,6 +1316,11 @@ def armar_sel(carpeta, sel, nombre, cfg, log):
     voz = cfg.get("voz_en_off", True)
     narrados = {int(n["clip"]) for n in sel.get("narracion", [])}
     for i_clip, c in enumerate(sel["clips"]):
+        if es_escena(c):  # escena animada ya renderizada: pantalla completa, sin sonido, sin encuadre ni desenfoque
+            script.add_segment(cc.VideoSegment(c["mp4"], trange_seconds(t, duration=c["segundos"]), volume=0), "video")
+            inicio.append(t)
+            t += c["segundos"]
+            continue
         path = os.path.join(carpeta, c["archivo"])
         if c["foto"]:
             path = foto_compatible(path)
@@ -1322,19 +1344,21 @@ def armar_sel(carpeta, sel, nombre, cfg, log):
 
     # Gancho (primer clip), chip de cada paso (primer clip del paso) y CTA (último clip)
     png_gancho(sel["gancho"], sel.get("promesa", ""), g := os.path.join(out, "gancho.png"))
-    overlay(g, 0, min(4.0, sel["clips"][0]["segundos"]))
+    if not es_escena(sel["clips"][0]):
+        overlay(g, 0, min(4.0, sel["clips"][0]["segundos"]))
     cues = []
     for i, c in enumerate(sel["clips"]):
         p = c.get("paso", "")
-        if p in fmt["pasos"] and p not in paso_visto and i > 0:
+        if p in fmt["pasos"] and p not in paso_visto and i > 0 and not es_escena(c):
             paso_visto.add(p)
             png_paso(p, fmt["pasos"][p], png := os.path.join(out, f"paso{p}.png"), fmt["kicker"])
             overlay(png, inicio[i], min(3.5, c["segundos"]))
             cues.append(inicio[i])
     ult = sel["clips"][-1]["segundos"]
-    png_cta(cta := os.path.join(out, "cta.png"))
     cta_ini = t - min(ult, 4.0)
-    overlay(cta, cta_ini, t - cta_ini, "cta")
+    if not (es_escena(sel["clips"][-1]) and sel["clips"][-1]["escena"] == "cta"):  # la escena cta ya trae su cierre
+        png_cta(cta := os.path.join(out, "cta.png"))
+        overlay(cta, cta_ini, t - cta_ini, "cta")
 
     # Narración como texto: en CapCut -> seleccionar los textos de la pista "voz" -> Texto a voz -> Nandez
     estilo = cc.TextStyle(size=7, bold=True, color=(0.94, 0.93, 0.91), align=1, auto_wrapping=True)
