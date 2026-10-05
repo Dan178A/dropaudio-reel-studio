@@ -61,7 +61,8 @@
         "tipo": "string",
         "max": null,
         "opcional": true,
-        "origen": "productos/mapa.json (nunca del LLM)"
+        "origen": "productos/mapa.json (nunca del LLM)",
+        "nota": "Pasar SIEMPRE: \"productos/<archivo>\" si el producto está en mapa.json, o \"\" para la versión tipográfica (si se omite, se usa la imagen de ejemplo del default)."
       }
     }
   },
@@ -183,7 +184,8 @@
         "tipo": "string",
         "max": null,
         "opcional": true,
-        "origen": "productos/mapa.json (nunca del LLM)"
+        "origen": "productos/mapa.json (nunca del LLM)",
+        "nota": "Pasar SIEMPRE: \"productos/<archivo>\" si el producto está en mapa.json, o \"\" para la versión tipográfica (si se omite, se usa la imagen de ejemplo del default)."
       }
     }
   },
