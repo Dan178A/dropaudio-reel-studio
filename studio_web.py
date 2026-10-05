@@ -28,7 +28,7 @@ CFG = {"carpeta": rutas.videos_defecto(), "vision": "gemma3:4b", "jev": "nimble:
        "escritor": "glm-5.3:cloud", "whisper": "small", "paso": 3.0, "minimo": 0.5, "drafts": core.CAPCUT_DRAFTS,
        "vol_clips": 1.0, "vol_musica": 0.25, "musica": True, "nombre": "reel_auto_01", "rehacer": False,
        "simultaneos": 6, "saltar_repetidos": True, "formatos": list(core.ORDEN_FORMATOS), "max_por_formato": 2, "catalogo": [],
-       "voz_en_off": True, "critico": True}
+       "voz_en_off": True, "critico": True, "escenas": True, "duracion_objetivo": 35}
 if os.path.exists(CFG_FILE):
     CFG.update(json.load(open(CFG_FILE, encoding="utf-8")))
 
@@ -473,8 +473,9 @@ class H(BaseHTTPRequestHandler):
                 datos = leer("analisis.json") or {}
                 for sel in serie.get("videos", []):
                     for c in sel.get("clips", []):
-                        c["hasta"] = float(c.get("desde", 0)) + float(c.get("segundos", 0))
-                    core.validar(sel, datos)
+                        if not core.es_escena(c):  # una escena no tiene tramo: su duración sale de sus textos
+                            c["hasta"] = float(c.get("desde", 0)) + float(c.get("segundos", 0))
+                    core.validar(sel, datos, catalogo=CFG.get("catalogo", []))
                     sel["nombre"] = (sel.get("nombre") or "reel").strip()
                 serie.setdefault("avisos", [])
                 core.guardar_serie(CFG["carpeta"], serie)
