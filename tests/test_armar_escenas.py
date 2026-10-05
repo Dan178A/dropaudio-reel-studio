@@ -36,7 +36,7 @@ def entorno(tmp_path, monkeypatch):
     _mp4(str(carpeta / "real.mp4"), 4)
     drafts = tmp_path / "drafts"
     drafts.mkdir()
-    escena_mp4 = _mp4(str(tmp_path / "escena.mp4"), 3)
+    escena_mp4 = _mp4(str(tmp_path / "escena.mp4"), 3.5)  # algo más largo que el clip (3 s): no se recorta
     llamadas = []
     pasos = []
 
@@ -154,3 +154,65 @@ def test_primer_clip_escena_sin_gancho(entorno, monkeypatch):
     sel["narracion"] = []
     rs.armar_sel(str(carpeta), sel, "t_g", cfg, lambda k, x: None)
     assert pedidos == []
+
+
+# ---------------------------------------------------------------- duración real del .mp4 y fallos de pycapcut
+def test_mp4_mas_corto_que_lo_pedido_recorta_el_clip(entorno, tmp_path, monkeypatch):
+    carpeta, drafts, cfg, *_ = entorno
+    corto = _mp4(str(tmp_path / "corto.mp4"), 2)
+    monkeypatch.setattr(escenas, "render", lambda t, d, c, dur=None: corto)
+    logs = []
+    t = rs.armar_sel(str(carpeta), _sel("precio"), "t_corto", cfg, lambda k, x: logs.append((k, x)))
+    real = rs.duracion(corto)
+    assert abs(t - (4.0 + int((real - 0.01) * 100) / 100)) < 1e-6 and t < 6.0
+    assert not [x for k, x in logs if k == "error"]
+
+
+def test_valueerror_de_pycapcut_omite_la_escena(entorno, tmp_path, monkeypatch):
+    carpeta, drafts, cfg, *_ = entorno
+    corto = _mp4(str(tmp_path / "corto.mp4"), 2)
+    monkeypatch.setattr(escenas, "render", lambda t, d, c, dur=None: corto)
+    monkeypatch.setattr(rs, "duracion", lambda p: 99.0)  # la medición falla «a favor»: pycapcut sí lo detecta
+    logs = []
+    t = rs.armar_sel(str(carpeta), _sel("precio"), "t_valueerror", cfg, lambda k, x: logs.append((k, x)))
+    assert abs(t - 4.0) < 1e-6
+    assert any(k == "error" and "precio" in x and "se omite" in x for k, x in logs)
+    d = _contenido(drafts, "t_valueerror")
+    assert d["duration"] == 4_000_000
+    assert not any("corto.mp4" in m.get("path", "") for m in d["materials"]["videos"])
+
+
+# ---------------------------------------------------------------- R1: CTA nunca sobre una escena
+def _cta(d):
+    tr = next(tr for tr in d["tracks"] if tr.get("name") == "cta")
+    return [(sg["target_timerange"]["start"], sg["target_timerange"]["duration"]) for sg in tr["segments"]]
+
+
+def test_cta_va_sobre_el_ultimo_video_real_si_cierra_otra_escena(entorno):
+    carpeta, drafts, cfg, *_ = entorno
+    rs.armar_sel(str(carpeta), _sel("precio"), "t_cta_real", cfg, lambda k, x: None)
+    assert _cta(_contenido(drafts, "t_cta_real")) == [(0, 4_000_000)]  # sobre real.mp4 (0-4 s), no sobre la escena
+
+
+def test_cta_ausente_si_no_hay_video_real(entorno, monkeypatch):
+    carpeta, drafts, cfg, *_ = entorno
+    pedidos = []
+    original = rs.png_cta
+    monkeypatch.setattr(rs, "png_cta", lambda dest: (pedidos.append(dest), original(dest))[1])
+    sel = _sel("precio")
+    sel["clips"] = sel["clips"][1:]
+    sel["narracion"] = []
+    rs.armar_sel(str(carpeta), sel, "t_cta_nada", cfg, lambda k, x: None)
+    assert pedidos == [] and _cta(_contenido(drafts, "t_cta_nada")) == []
+
+
+# ---------------------------------------------------------------- R2: narración sobre escena en la franja de abajo
+def test_narracion_sobre_escena_baja_a_la_franja_libre(entorno):
+    carpeta, drafts, cfg, *_ = entorno
+    rs.armar_sel(str(carpeta), _sel("precio"), "t_franja", cfg, lambda k, x: None)
+    d = _contenido(drafts, "t_franja")
+    textos = {m["id"]: json.loads(m["content"])["text"] for m in d["materials"]["texts"]}
+    voz = next(tr for tr in d["tracks"] if tr["type"] == "text")
+    ys = {textos[sg["material_id"]]: sg["clip"]["transform"]["y"] for sg in voz["segments"]}
+    assert ys == {"Hola uno": rs.Y_VOZ, "Aquí el precio": rs.Y_VOZ_ESCENA}
+    assert 1540 < 960 - rs.Y_VOZ_ESCENA * 960 < 1720  # centro del texto en la franja libre, dentro de la zona segura

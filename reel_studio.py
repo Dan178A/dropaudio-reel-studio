@@ -651,31 +651,53 @@ MAX_ESCENAS = 0.4  # las escenas no pasan del 40 % del reel: el video real es el
 CTA_ESCENA = "Lo pruebas antes de pagar"
 
 
+def banda_duracion(objetivo):
+    """(mínimo, máximo) de la duración ideal según la duración objetivo: 35 -> 30-45, 45 -> 40-48, 60 -> 55-63.
+    La interfaz (studio.html, renderGuion) usa la misma regla."""
+    objetivo = int(objetivo or 35)
+    return objetivo - 5, max(45, objetivo + 3)
+
+
 def escenas_activas(cfg):
     """Escenas animadas: si el usuario las tiene activas (por defecto sí) y hay Node 22+ y FFmpeg."""
     return bool(cfg.get("escenas", True)) and bool(escenas.disponible()[0])
 
 
 def _precios_del_plan(plan, catalogo):
-    """[(nombre corto, precio)] que el modelo puede usar en las escenas: el producto del reel, o los productos
-    de los archivos del plan si el reel no es de uno solo. Nunca precios que no estén en el catálogo de la app."""
+    """[(nombre, precio)] que el modelo puede usar en las escenas: el producto del reel, o los productos de los
+    archivos del plan si el reel no es de uno solo. Nunca precios que no estén en el catálogo de la app.
+    El nombre es el COMPLETO del catálogo (el corto puede ser de varios productos: «KZ Castor Pro» Harman/Bass);
+    solo si no cabe en la escena se usa el corto, y únicamente cuando no es ambiguo."""
     nombres = [plan["producto"]] if plan.get("producto") else list(plan.get("productos") or [])
     out = []
     for n in dict.fromkeys(nombres):
         pr = precio_de(n, catalogo)
         if isinstance(pr, (int, float)):
-            out.append((nombre_corto(n), pr))
+            out.append((escenas.nombre_para_escena(n, catalogo), pr))
     return out
+
+
+def presupuesto_escenas(real, objetivo):
+    """Segundos de escenas que el modelo puede usar: lo que falta para el objetivo, sin pasar del 40 % del reel
+    (escenas <= 2/3 del video real), redondeado hacia abajo a 0,5 s. 0 si el video real ya llega al objetivo."""
+    x = min(float(objetivo) - real, real * MAX_ESCENAS / (1 - MAX_ESCENAS))
+    return max(0.0, int(x * 2 + 1e-9) / 2)
 
 
 def prompt_escenas(plan, catalogo):
     """Sección extra del prompt del escritor cuando el plan admite escenas animadas (sale de catalogo.json)."""
     real, objetivo = float(plan.get("segundos_material") or 0), int(plan.get("objetivo") or 35)
+    x, tope = presupuesto_escenas(real, objetivo), presupuesto_escenas(real, float("inf"))
+    if x > 0:
+        meta = (f"Usa como máximo {x:g} s de escenas en total. El objetivo es una meta, no una obligación: si con "
+                f"ese presupuesto no se llega a {objetivo} s, el reel puede quedar más corto; nunca pases del "
+                "presupuesto para completarlo.")
+    else:
+        meta = (f"El video real ya llega al objetivo: usa escenas solo si aportan (como máximo {tope:g} s en total).")
     lin = ["", "ESCENAS ANIMADAS: además del video puedes usar plantillas animadas de la marca. Tú solo eliges la "
                "plantilla y escribes sus textos; la animación ya está hecha.",
            f"- Hay {real:.0f} s de video real. La duración objetivo del reel es {objetivo} s (manda sobre el rango "
-           "de 30 a 45 s de arriba). Si el video real no llega al objetivo, complétalo con escenas; si llega, "
-           "úsalas solo si aportan.",
+           f"de 30 a 45 s de arriba). {meta}",
            "- Plantillas (tipo · duración aprox. · pasos donde encaja · qué es · variables):"]
     for tipo, cat in escenas.catalogo().items():
         vars_ = []
@@ -691,8 +713,8 @@ def prompt_escenas(plan, catalogo):
             "  · El video real va primero y es el núcleo. El gancho SIEMPRE es video real: nunca empieces con una escena.",
             "  · Cada escena solo en uno de sus pasos.",
             f"  · Las escenas suman como máximo el {MAX_ESCENAS * 100:.0f} % del reel.",
-            "  · Precios SOLO de esta lista, con el nombre y el precio exactos: "
-            + ("; ".join(f"{n}: ${pr:g}" for n, pr in precios) if precios else
+            "  · Precios SOLO de esta lista, con el nombre (completo, tal cual) y el precio exactos: "
+            + ("; ".join(f"«{n}»: ${pr:g}" for n, pr in precios) if precios else
                "(no hay precios para este reel: no uses «precio» ni «comparativa»)") + "."
             + (" «comparativa» necesita dos productos de esta lista: aquí no se puede." if len(precios) == 1 else ""),
             "  · Textos cortos en español, de 1 o 2 líneas; respeta los máximos.",
@@ -732,7 +754,7 @@ def _escenas_de_relleno(plan, catalogo, real):
     candidatas = []
     pr = precio_de(plan.get("producto"), catalogo) if plan.get("producto") else None
     if isinstance(pr, (int, float)):
-        candidatas.append(("precio", {"producto": nombre_corto(plan["producto"]), "precio": pr,
+        candidatas.append(("precio", {"producto": escenas.nombre_para_escena(plan["producto"], catalogo), "precio": pr,
                                       "detalle": "7 días de garantía · pagas al probar"}))
     candidatas.append(("cta", {"linea": CTA_ESCENA}))
     out, esc = [], 0.0
@@ -846,9 +868,10 @@ Responde SOLO con JSON: {{"puntaje": 0-10, "veredicto": "publicar|mejorar|descar
 
 CRITICO_ESCENAS = """
 Este reel puede llevar ESCENAS ANIMADAS de la marca (clips «ESCENA <tipo>»: una plantilla con textos, sin archivo).
-La duración objetivo es {objetivo} s. Revisa también: ¿el gancho es video real?, ¿las escenas no pasan del 40 % del
-reel?, ¿cada escena está en un paso donde encaja?, ¿sus textos y precios son correctos? En el guion corregido, una
-escena se escribe {{"escena": "<tipo>", "paso": "...", "datos": {{...las mismas variables...}}}}."""
+La duración objetivo es {objetivo} s, pero es una meta, no una obligación: si hay poco video real y las escenas ya
+están cerca del 40 %, que el reel quede por debajo del objetivo está bien (no lo penalices ni agregues escenas).
+Revisa también: ¿el gancho es video real?, ¿las escenas no pasan del 40 % del reel?, ¿cada escena está en un paso
+donde encaja?, ¿sus textos y precios son correctos? En el guion corregido, una escena se escribe {{"escena": "<tipo>", "paso": "...", "datos": {{...las mismas variables...}}}}."""
 
 ESQUEMA_CRITICA = {
     "type": "object", "required": ["puntaje", "veredicto", "problemas"],
@@ -902,13 +925,18 @@ def chequeos(sel, datos, voz=True):
     La duración cuenta las escenas animadas; lo demás (planos quietos, tramos repetidos, fotos) mira solo el video."""
     probs, graves = [], 0
     dur = sum(c["segundos"] for c in sel["clips"])
-    tope = max(50, int(sel.get("objetivo") or 35) + 8)  # con objetivo 60 s, 55 s no es «largo»
-    if dur < 20:
-        probs.append(f"Dura {dur:.0f} s: demasiado corto, no va a enganchar (apunta a 30-45 s)."); graves += 3
-    elif dur < 25:
-        probs.append(f"Dura {dur:.0f} s: muy corto para enganchar (apunta a 30-45 s)."); graves += 2
+    lo, hi = banda_duracion(sel.get("objetivo"))
+    tope = hi + 5  # con objetivo 60 s, 65 s no es «largo»
+    esc_seg = sum(c["segundos"] for c in sel["clips"] if es_escena(c))
+    # Reel rescatado: poco video real y las escenas ya en el tope del 40 %. Quedar bajo el objetivo es lo esperado
+    # (el objetivo es una meta); si el video real no alcanza el mínimo, eso se avisa aparte.
+    rescatado = esc_seg > 0 and dur and esc_seg / dur >= MAX_ESCENAS - 0.02
+    if dur < 20 and not rescatado:
+        probs.append(f"Dura {dur:.0f} s: demasiado corto, no va a enganchar (apunta a {lo}-{hi} s)."); graves += 3
+    elif dur < 25 and not rescatado:
+        probs.append(f"Dura {dur:.0f} s: muy corto para enganchar (apunta a {lo}-{hi} s)."); graves += 2
     elif dur > tope:
-        probs.append(f"Dura {dur:.0f} s: largo; recorta a 30-45 s."); graves += 1
+        probs.append(f"Dura {dur:.0f} s: largo; recorta a {lo}-{hi} s."); graves += 1
     vistos, prod_seg, fotos = set(), 0.0, 0.0
     for i, c in enumerate(sel["clips"]):
         if es_escena(c):
@@ -1273,7 +1301,9 @@ def sin_clips(sel, quitar):
 
 def renderizar_escenas(carpeta, sel, nombre, log):
     """Renderiza las escenas del guion a <carpeta>/_reel_studio/escenas/ y anota la ruta en el clip ("mp4").
-    Una escena que falla se omite con aviso (la narración se reubica) y el reel se arma igual."""
+    Una escena que falla se omite con aviso (la narración se reubica) y el reel se arma igual.
+    Si el .mp4 salió algo más corto que lo pedido, el clip se acorta a lo que dura de verdad (pycapcut rechaza un
+    tramo que pase del final del archivo)."""
     idx = [i for i, c in enumerate(sel.get("clips", [])) if es_escena(c)]
     if not idx:
         return sel
@@ -1284,11 +1314,27 @@ def renderizar_escenas(carpeta, sel, nombre, log):
         c = clips[i]
         log("estado", f"«{nombre}»: renderizando escena {k + 1}/{len(idx)} ({c['escena']})…")
         try:
-            clips[i] = dict(c, mp4=escenas.render(c["escena"], c["datos"], cache, dur=c["segundos"]))
+            mp4 = escenas.render(c["escena"], c["datos"], cache, dur=c["segundos"])
+            seg = c["segundos"]
+            try:
+                real = duracion(mp4)
+            except (OSError, ValueError):
+                real = None  # sin ffprobe no se mide; pycapcut lo comprobará al armar
+            if real is not None:
+                if real < 0.5:
+                    raise RuntimeError(f"el video de la escena dura {real:.2f} s")
+                seg = min(seg, int((real - 0.01) * 100) / 100)
+            clips[i] = dict(c, mp4=mp4, segundos=seg)
         except Exception as e:
             fallidas.add(i)
             log("error", f"«{nombre}»: la escena «{c['escena']}» falló y se omite: {e}")
     return sin_clips(dict(sel, clips=clips), fallidas)
+
+
+# Altura del texto de la narración (CapCut: transform_y -1 = abajo … 1 = arriba, centro de la caja de texto;
+# y en píxeles = 960 - transform_y * 960). Sobre una escena: y ≈ 1670, en la franja libre y dentro de la zona segura.
+Y_VOZ = -0.42
+Y_VOZ_ESCENA = -0.74
 
 
 def armar_sel(carpeta, sel, nombre, cfg, log):
@@ -1296,6 +1342,19 @@ def armar_sel(carpeta, sel, nombre, cfg, log):
     from pycapcut import trange_seconds, tim
 
     sel = renderizar_escenas(carpeta, sel, nombre, log)
+    # Cada escena se prueba con pycapcut antes de crear el borrador: si su tramo no cabe en el .mp4 (ValueError) u
+    # otro fallo del archivo, se omite como una escena fallida (narración reubicada) en vez de tumbar todo el reel.
+    clips, malas = list(sel.get("clips", [])), set()
+    for i, c in enumerate(clips):
+        if es_escena(c):
+            try:
+                mat = cc.VideoMaterial(c["mp4"])
+                cc.VideoSegment(mat, trange_seconds(0, duration=c["segundos"]), volume=0)
+                clips[i] = dict(c, material=mat)
+            except Exception as e:
+                malas.add(i)
+                log("error", f"«{nombre}»: la escena «{c['escena']}» no se pudo poner en CapCut y se omite: {e}")
+    sel = sin_clips(dict(sel, clips=clips), malas)
     if not sel.get("clips"):
         raise RuntimeError(f"«{nombre}» no tiene clips.")
     fmt = FORMATOS.get(sel.get("formato"), FORMATOS["asi_compras"])
@@ -1317,7 +1376,8 @@ def armar_sel(carpeta, sel, nombre, cfg, log):
     narrados = {int(n["clip"]) for n in sel.get("narracion", [])}
     for i_clip, c in enumerate(sel["clips"]):
         if es_escena(c):  # escena animada ya renderizada: pantalla completa, sin sonido, sin encuadre ni desenfoque
-            script.add_segment(cc.VideoSegment(c["mp4"], trange_seconds(t, duration=c["segundos"]), volume=0), "video")
+            script.add_segment(cc.VideoSegment(c["material"], trange_seconds(t, duration=c["segundos"]), volume=0),
+                               "video")
             inicio.append(t)
             t += c["segundos"]
             continue
@@ -1355,23 +1415,38 @@ def armar_sel(carpeta, sel, nombre, cfg, log):
                 png_paso(p, fmt["pasos"][p], png := os.path.join(out, f"paso{p}.png"), fmt["kicker"])
                 overlay(png, inicio[i], min(3.5, c["segundos"]))
             cues.append(inicio[i])
-    ult = sel["clips"][-1]["segundos"]
-    cta_ini = t - min(ult, 4.0)
-    if not (es_escena(sel["clips"][-1]) and sel["clips"][-1]["escena"] == "cta"):  # la escena cta ya trae su cierre
+    # CTA: nunca encima de una escena (taparía su texto). Si el reel cierra con la escena «cta», ella ya es el cierre;
+    # si cierra con otra escena, la tarjeta va al final del último clip de video real (si no hay, no va).
+    ult = sel["clips"][-1]
+    cta_ini = t - min(ult["segundos"], 4.0)
+    if not es_escena(ult):
+        j = len(sel["clips"]) - 1
+    elif ult["escena"] == "cta":
+        j = None
+    else:
+        j = next((i for i in range(len(sel["clips"]) - 1, -1, -1) if not es_escena(sel["clips"][i])), None)
+    if j is not None:
+        fin = inicio[j] + sel["clips"][j]["segundos"]
+        cta_ini = fin - min(sel["clips"][j]["segundos"], 4.0)
         png_cta(cta := os.path.join(out, "cta.png"))
-        overlay(cta, cta_ini, t - cta_ini, "cta")
+        overlay(cta, cta_ini, fin - cta_ini, "cta")
 
-    # Narración como texto: en CapCut -> seleccionar los textos de la pista "voz" -> Texto a voz -> Nandez
+    # Narración como texto: en CapCut -> seleccionar los textos de la pista "voz" -> Texto a voz -> Nandez.
+    # Sobre video real va donde siempre; si toca una escena, baja a la franja libre de abajo (las plantillas dejan
+    # y ≈ 1540-1920 sin contenido) para no tapar los textos de la escena.
     estilo = cc.TextStyle(size=7, bold=True, color=(0.94, 0.93, 0.91), align=1, auto_wrapping=True)
+    tramos_escena = [(inicio[i], inicio[i] + c["segundos"]) for i, c in enumerate(sel["clips"]) if es_escena(c)]
     fin_ocupado = 0.0
     for n in sel.get("narracion", []):
         start = max(inicio[int(n["clip"])] + float(n.get("en", 0.3)), fin_ocupado)
         dur = max(1.5, len(n["texto"].split()) * 0.38)  # ~2,6 palabras por segundo
         if start + dur > t:
             continue
+        sobre_escena = any(a < start + dur and start < b for a, b in tramos_escena)
         script.add_segment(cc.TextSegment(n["texto"], trange_seconds(start, duration=dur), style=estilo,
                                           background=cc.TextBackground(color="#090807", alpha=0.6, round_radius=0.3),
-                                          clip_settings=cc.ClipSettings(transform_y=-0.42)), "voz")
+                                          clip_settings=cc.ClipSettings(
+                                              transform_y=Y_VOZ_ESCENA if sobre_escena else Y_VOZ)), "voz")
         fin_ocupado = start + dur + 0.1
 
     if cfg["musica"]:

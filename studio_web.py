@@ -323,6 +323,10 @@ def motivo_escena(c, catalogo):
                 return f"el campo «{var}» no es un número."
             nombre = datos.get("producto") if var == "precio" else str(datos.get(var.replace("_precio", "_nombre"), ""))
             real = escenas._precio_catalogo(nombre, catalogo)
+            varios = escenas.ambiguos(nombre, catalogo)
+            if real is None and varios:
+                return (f"«{nombre}» puede ser {' o '.join('«%s»' % v for v in varios)}: escribe el nombre completo "
+                        f"(campo «{var}»).")
             if real is None:
                 return f"«{nombre}» no está en tu catálogo de productos con precio (campo «{var}»)."
             if abs(real - x) > 0.005:
@@ -334,8 +338,9 @@ _ESC_CACHE = [0.0, None]
 
 
 def estado_escenas():
-    """{"disponible", "motivo"} de las escenas animadas. Un fallo no se cachea en escenas.py (para detectar Node recién
-    instalado), así que aquí se reusa 30 s para no lanzar `node --version` en cada sondeo de la interfaz."""
+    """{"disponible", "motivo"} de las escenas animadas. Un fallo no se cachea en escenas.py (por si ffmpeg/node
+    aparecen en una carpeta que ya estaba en el PATH; si no, hay que reiniciar Reel Studio), así que aquí se reusa
+    30 s para no lanzar `node --version` en cada sondeo de la interfaz."""
     if _ESC_CACHE[1] is None or time.time() - _ESC_CACHE[0] > 30:
         _ESC_CACHE[0], _ESC_CACHE[1] = time.time(), dict(zip(("disponible", "motivo"), escenas.disponible()))
     return _ESC_CACHE[1]

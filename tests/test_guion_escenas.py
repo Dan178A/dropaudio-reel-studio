@@ -307,3 +307,68 @@ def test_sin_clips_reubica_narracion():
     assert [c["archivo"] for c in out["clips"]] == ["a.mp4", "b.mp4"]
     assert out["narracion"] == [{"clip": 1, "en": 0.3, "texto": "y"}]
     assert len(sel["clips"]) == 3  # no toca el original
+
+
+# ---------------------------------------------------------------- R3: el objetivo es una meta
+def test_presupuesto_escenas():
+    assert rs.presupuesto_escenas(22, 60) == 14.5  # 2/3 de 22 = 14,67 -> 14,5 (tope del 40 %)
+    assert rs.presupuesto_escenas(30, 35) == 5.0  # lo que falta para el objetivo
+    assert rs.presupuesto_escenas(40, 35) == 0.0
+
+
+def test_prompt_escenas_da_presupuesto_y_permite_quedar_corto():
+    plan = {"formato": "unboxing", "producto": "KZ Castor Pro (Harman)", "escenas": True, "objetivo": 60,
+            "segundos_material": 22.0}
+    txt = rs.prompt_escenas(plan, CATALOGO)
+    assert "como máximo 14.5 s de escenas" in txt
+    assert "meta, no una obligación" in txt and "puede quedar más corto" in txt
+    assert "complétalo con escenas" not in txt
+    largo = rs.prompt_escenas(dict(plan, objetivo=35, segundos_material=40.0), CATALOGO)
+    assert "ya llega al objetivo" in largo and "26.5 s" in largo
+
+
+def _clip(seg, escena_=None):
+    if escena_:
+        return {"escena": escena_, "datos": {"linea": "x"}, "segundos": seg, "paso": "cta"}
+    return {"archivo": "a.mp4", "foto": False, "desde": 0, "segundos": seg, "paso": "2", "motivo": "", "audio": True}
+
+
+def test_chequeos_no_castiga_reel_rescatado_bajo_el_objetivo():
+    sel = {"formato": "asi_compras", "objetivo": 60, "clips": [_clip(22), _clip(14.5, "cta")], "narracion": []}
+    probs, graves = rs.chequeos(sel, {}, voz=False)
+    assert not any("Dura" in p for p in probs) and graves == 0
+    # muy poco video real con escenas al tope: el aviso es el del video real, no el de la duración
+    sel = {"formato": "asi_compras", "objetivo": 60, "clips": [_clip(12), _clip(8, "cta")], "narracion": []}
+    probs, graves = rs.chequeos(sel, {}, voz=False)
+    assert not any("Dura" in p for p in probs) and any("video real" in p for p in probs)
+
+
+def test_chequeos_banda_de_duracion_sale_del_objetivo():
+    assert rs.banda_duracion(35) == (30, 45) and rs.banda_duracion(60) == (55, 63)
+    probs, _ = rs.chequeos({"formato": "asi_compras", "clips": [_clip(22)], "narracion": []}, {}, voz=False)
+    assert any("apunta a 30-45 s" in p for p in probs)
+    probs, _ = rs.chequeos({"formato": "asi_compras", "objetivo": 60, "clips": [_clip(70)], "narracion": []}, {},
+                           voz=False)
+    assert any("recorta a 55-63 s" in p for p in probs)
+    probs, _ = rs.chequeos({"formato": "asi_compras", "objetivo": 60, "clips": [_clip(66)], "narracion": []}, {},
+                           voz=False)
+    assert not any("Dura" in p for p in probs)
+
+
+def test_critico_sabe_que_el_objetivo_es_una_meta():
+    assert "meta, no una obligación" in rs.CRITICO_ESCENAS.format(objetivo=60)
+
+
+# ---------------------------------------------------------------- nombres cortos repetidos
+def test_prompt_y_relleno_usan_el_nombre_completo():
+    cat = CATALOGO + [{"nombre": "KZ Castor Pro (Bass)", "precio": 14.0}]
+    plan = {"formato": "unboxing", "producto": "KZ Castor Pro (Bass)", "escenas": True, "objetivo": 35,
+            "segundos_material": 22.0}
+    txt = rs.prompt_escenas(plan, cat)
+    assert "«KZ Castor Pro (Bass)»: $14" in txt
+    rel = rs._escenas_de_relleno(plan, cat, 22.0)
+    precio = next(c for c in rel if c["escena"] == "precio")
+    assert precio["datos"]["producto"] == "KZ Castor Pro (Bass)" and precio["datos"]["precio"] == 14
+    # el nombre corto ambiguo no valida: el guion no puede colar el precio del otro modelo
+    assert rs.validar_escena_clip({"escena": "precio", "paso": "cta",
+                                   "datos": {"producto": "KZ Castor Pro", "precio": 13, "detalle": "x"}}, cat) is None

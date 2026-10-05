@@ -499,7 +499,8 @@ $("#bModels").onclick = () => { delete $("#sVision").dataset.loaded; api("/api/t
 
 /* ---------- pasos ---------- */
 for (const [b, t] of [["#b1","analizar"],["#b2","guion"],["#b3","armar"]])
-  $(b).onclick = async () => { const r = await api(`/api/tarea/${t}`, {}); if (!r.ok) toast("Ya hay una tarea en curso.", true); poll(); };
+  $(b).onclick = async () => { if (t === "armar" && !await guardarYa()) return;  // CapCut se arma con lo que ves
+    const r = await api(`/api/tarea/${t}`, {}); if (!r.ok) toast("Ya hay una tarea en curso.", true); poll(); };
 
 function renderSteps(d){
   const j = d.job, run = j.corriendo && j.tarea !== "modelos";
@@ -655,15 +656,17 @@ function escPasos(c){  // pasos donde encaja la plantilla (si aún no llega el c
   const ok = S.catEsc?.[c.escena]?.pasos;
   return Object.entries(PASOS).filter(([k]) => !ok || ok.includes(k) || k === c.paso);
 }
+const bandaDuracion = obj => { obj = +obj || 35; return [obj - 5, Math.max(45, obj + 3)]; };  // = reel_studio.banda_duracion
 const nombreCorto = n => (String(n || "").replace(/\s*\([^)]*\)/g, "").trim() || String(n || ""));
-function precioCat(nombre){  // precio del catálogo de la app (nombre completo o corto), o null
-  const n = String(nombre || "").trim().toLowerCase(); if (!n) return null;
-  const cat = S.cfg?.catalogo || [];
-  for (const exacto of [true, false]) for (const p of cat){
-    const cand = (exacto ? String(p.nombre || "") : nombreCorto(p.nombre)).toLowerCase();
-    if (cand === n && p.precio != null && p.precio !== "") return +p.precio;
-  }
-  return null;
+function coincidenciasCat(nombre){  // productos con precio que corresponden al nombre (misma regla que escenas.py)
+  const n = String(nombre || "").trim().toLowerCase(); if (!n) return [];
+  const cat = (S.cfg?.catalogo || []).filter(p => p.nombre && p.precio != null && p.precio !== "" && !isNaN(+p.precio));
+  const exactos = cat.filter(p => String(p.nombre).trim().toLowerCase() === n);
+  return exactos.length ? exactos.slice(0, 1) : cat.filter(p => nombreCorto(p.nombre).trim().toLowerCase() === n);
+}
+function precioCat(nombre){  // precio del catálogo: nombre completo, o corto solo si es de un único producto; o null
+  const m = coincidenciasCat(nombre);
+  return m.length === 1 ? +m[0].precio : null;
 }
 const refNombre = (k, c) => k === "precio" ? c.datos?.producto : c.datos?.[k.replace("_precio", "_nombre")];
 function escLista(c){  // [[variable, {tipo, max}]] sin `imagen` (la resuelve el servidor)
@@ -690,7 +693,9 @@ function escProblemas(){  // todas las escenas de todos los reels que hoy no val
       for (const [k, t] of escLista(c)){
         const val = c.datos?.[k];
         if (t.tipo === "number"){
-          if (val === "" || val == null || isNaN(+val)) out.push({vi:n, i, k, msg:`${nom}: «${refNombre(k, c) || "?"}» no está en tu catálogo de productos con precio (campo «${k}»).`});
+          const varios = coincidenciasCat(refNombre(k, c));
+          if (varios.length > 1) out.push({vi:n, i, k, msg:`${nom}: «${refNombre(k, c)}» puede ser ${varios.map(p => `«${p.nombre}»`).join(" o ")}: escribe el nombre completo (campo «${k}»).`});
+          else if (val === "" || val == null || isNaN(+val)) out.push({vi:n, i, k, msg:`${nom}: «${refNombre(k, c) || "?"}» no está en tu catálogo de productos con precio (campo «${k}»).`});
         } else if (typeof val !== "string" || !val.trim()) out.push({vi:n, i, k, msg:`${nom}: el campo «${k}» está vacío.`});
       }
     });
@@ -715,7 +720,10 @@ function renderGuion(){
   if (!G){ $("#nG").textContent = "—"; p.innerHTML = `<div class="empty"><b>Todavía no hay guiones</b>Cuando termines el análisis, elige los formatos en el paso 2 y pulsa <b>Escribir guiones</b>. Saldrá un reel por formato (o más, si hay material) y podrás editar cada uno aquí.</div>`; return; }
   G.clips.forEach(c => { if (esEscena(c)) sincPrecios(c); });
   const total = G.clips.reduce((s,c)=>s+(+c.segundos||0),0);
-  const ok = total >= 28 && total <= 47;
+  const [lo, hi] = bandaDuracion(G.objetivo);
+  const escSeg = G.clips.reduce((s,c)=>s+(esEscena(c) ? (+c.segundos||0) : 0),0);
+  const rescate = total < lo - 2 && escSeg > 0 && escSeg / total >= 0.38;  // escenas al tope del 40 %: el objetivo es una meta
+  const ok = rescate || (total >= lo - 2 && total <= hi + 2);
   $("#nG").textContent = vs.length;
   const avisos = S.guion?.avisos || [];
   p.innerHTML = `
@@ -735,7 +743,7 @@ function renderGuion(){
         <div class="field"><label for="gP">Promesa debajo del gancho</label><input type="text" id="gP" value="${esc(G.promesa)}" maxlength="50"></div>
       </div>
       <div><div class="field"><label>Así se verá</label><div class="hookprev" id="hookPrev">${esc(G.gancho)}</div></div>
-        <div class="durbox ${ok?"ok":"warn"}"><svg width="16" height="16"><use href="#i-${ok?"check":"x"}"/></svg>${fmt(total)} ${ok?"· duración ideal":"· apunta a 30–45 s"}</div>
+        <div class="durbox ${ok?"ok":"warn"}"><svg width="16" height="16"><use href="#i-${ok?"check":"x"}"/></svg>${fmt(total)} ${rescate?"· bajo el objetivo, escenas al máximo":ok?"· duración ideal":`· apunta a ${lo}–${hi} s`}</div>
         ${vozHTML()}</div>
     </div>
     <div class="timeline" aria-hidden="true">${G.clips.map((c,i)=>`<div data-go="${i}" style="flex:${Math.max(+c.segundos,0.5)};background:${esEscena(c) ? COLOR_ESCENA : (PASOS[c.paso]||["","#6F675B"])[1]}" title="${esc(esEscena(c) ? "Escena · " + c.escena : c.archivo)}">${esc(esEscena(c) ? "✦ " + c.escena : (PASOS[c.paso]||[c.paso])[0])}</div>`).join("")}</div>
@@ -799,13 +807,13 @@ $("#pan-g").addEventListener("click", e => {
   const r = e.target.closest("[data-reel]");
   if (r){ if (G) guardar(true); cargarReel(+r.dataset.reel); renderGuion(); return; }
   if (e.target.closest("#gVoz")){
-    (async () => { S.guion.videos[S.vi] = {...S.guion.videos[S.vi], ...fromUI(G)}; await api("/api/guion", S.guion);
+    (async () => { if (!await guardarYa()) return;
       const r = await api("/api/completar_voz", {i: S.vi});
       if (r.ok){ S.guion = r.guion; S.gv = r.guion_v; cargarReel(S.vi); renderGuion(); toast("Rellené los huecos de la voz en off. Revísala y edítala a tu gusto."); } })();
     return;
   }
   if (e.target.closest("#gRev")){
-    (async () => { if (G) { S.guion.videos[S.vi] = {...S.guion.videos[S.vi], ...fromUI(G)}; await api("/api/guion", S.guion); }
+    (async () => { if (!await guardarYa()) return;
       const r = await api("/api/tarea/revisar", {}); if (!r.ok) toast("Ya hay una tarea en curso.", true); poll(); })();
     return;
   }
@@ -821,6 +829,17 @@ $("#pan-g").addEventListener("click", e => {
   if (b.dataset.delN){ const [i,j] = b.dataset.delN.split(":").map(Number); G.clips[i].narr.splice(j,1); }
   renderGuion(); guardar(true);
 });
+async function guardarYa(){  // guarda el guion ya (antes de revisar, completar la voz o crear en CapCut); false si no se pudo
+  clearTimeout(saveT);
+  if (!G || !S.guion) return true;
+  S.guion.videos[S.vi] = {...S.guion.videos[S.vi], ...fromUI(G)};
+  const pr = escProblemas();
+  if (pr.length){ toast("No guardé el guion. " + pr[0].msg + (pr.length > 1 ? ` (y ${pr.length - 1} problema(s) más)` : ""), true); return false; }
+  const r = await api("/api/guion", S.guion);
+  if (!r.ok){ toast("No pude guardar el guion: " + r.error, true); return false; }
+  S.guion = r.guion; S.gv = r.guion_v;
+  return true;
+}
 function guardar(ahora, borrado=false){
   clearTimeout(saveT);
   const vi = S.vi;

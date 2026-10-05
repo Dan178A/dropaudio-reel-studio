@@ -97,3 +97,10 @@ def test_guardar_escena_invalida_se_rechaza_sin_tocar_el_guion(servidor, datos, 
     assert code == 400 and r["ok"] is False
     assert "Así compras 1" in r["error"] and "clip 2" in r["error"] and "«precio»" in r["error"] and campo in r["error"]
     assert (carpeta / "serie.json").read_text(encoding="utf-8") == antes
+
+
+def test_motivo_escena_nombre_corto_ambiguo():
+    cat = [{"nombre": "KZ Castor Pro (Harman)", "precio": 13.0}, {"nombre": "KZ Castor Pro (Bass)", "precio": 14.0}]
+    c = {"escena": "precio", "paso": "cta", "datos": {"producto": "KZ Castor Pro", "precio": 13, "detalle": "x"}}
+    m = studio_web.motivo_escena(c, cat)
+    assert "«KZ Castor Pro (Harman)» o «KZ Castor Pro (Bass)»" in m and "nombre completo" in m and "precio" in m

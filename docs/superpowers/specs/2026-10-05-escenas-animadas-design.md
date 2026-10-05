@@ -66,7 +66,13 @@ y legibilidad.** Cada escena dura lo necesario para que su texto se lea con calm
 - `render(tipo, datos, cache_dir)` → ruta `.mp4`: hash de (tipo, datos, versión plantilla) → si existe en caché lo
   reutiliza; si no, copia la plantilla a una carpeta temporal y ejecuta
   `npx --yes hyperframes@0.8.77 render --variables-file vars.json --quality looks --output <hash>.mp4`
-  (timeout 300 s). Error → `RuntimeError` en español con las últimas líneas de salida.
+  (timeout 300 s; con `Popen` y, al vencer, se mata todo el árbol de procesos — `taskkill /T /F` en Windows, donde
+  `npx` es `npx.cmd`). Error → `RuntimeError` en español con las últimas líneas de salida. Todo `subprocess` de
+  `escenas.py` va sin ventana de consola en Windows (`CREATE_NO_WINDOW`). La clave de caché incluye además la versión
+  de HyperFrames y el hash del archivo de imagen; el `.mp4` se publica vía un `.part` único (`mkstemp`) y, si otro
+  render ya dejó el destino, se reutiliza.
+- Precios por nombre: primero el nombre completo del catálogo; el nombre corto solo vale si es de un único producto
+  (ambiguo → escena inválida, con un mensaje que pide el nombre completo). El prompt lista los nombres completos.
 - Caché en `<carpeta>/_reel_studio/escenas/`.
 
 ### C. Planificador y guion — `reel_studio.py`
@@ -80,7 +86,11 @@ y legibilidad.** Cada escena dura lo necesario para que su texto se lea con calm
   máximo 40 % del reel en escenas, precios solo del catálogo, el gancho siempre es video real.
 - `validar`: conserva las escenas válidas (`validar_escena`) con `segundos = escenas.duracion(tipo, datos)` y `paso` permitido;
   descarta las inválidas.
-- `chequeos`: la duración incluye escenas; nuevos problemas: video real < 20 s (grave 3), escenas > 40 % (grave 1),
+- **Objetivo = meta, no obligación (R3):** el prompt da un presupuesto explícito de escenas
+  X = min(objetivo − real, real·2/3) s (redondeado hacia abajo a 0,5 s) y dice que el reel puede quedar por debajo
+  del objetivo; nunca se pasa del 40 % para completarlo. El crítico recibe la misma regla.
+- `chequeos`: la duración incluye escenas; la banda ideal sale del objetivo (35 → 30–45, 45 → 40–48, 60 → 55–63; la
+  interfaz usa la misma) y un reel rescatado con las escenas al tope del 40 % no se castiga por quedar corto; nuevos problemas: video real < 20 s (grave 3), escenas > 40 % (grave 1),
   escena en paso no permitido (grave 1). `guion_en_texto` describe las escenas para el crítico.
 - `guion_por_reglas` (sin IA): si falta duración, agrega `precio` (si hay producto con precio) y `cta` al final.
 
@@ -88,8 +98,14 @@ y legibilidad.** Cada escena dura lo necesario para que su texto se lea con calm
 - Antes de crear el borrador, renderiza las escenas (con progreso en el log). Si una falla, se omite con aviso y el
   reel se arma igual.
 - Una escena entra en la pista `video` como `VideoSegment` del `.mp4` (volumen 0, sin encuadre/blur).
-- Sin chip de paso sobre una escena (la escena ya es el texto) y sin `png_cta` si el último clip es una escena `cta`.
-- La narración y la música siguen igual sobre todo el reel.
+- Si el `.mp4` dura menos que lo pedido, el clip se acorta a `duración real − 0,01 s`; si pycapcut aun así lo rechaza
+  (`ValueError`), la escena se omite como una fallida.
+- Sin chip de paso sobre una escena (la escena ya es el texto). **`png_cta` nunca va sobre una escena (R1):** si el
+  último clip es la escena `cta`, no hay `png_cta`; si es otra escena, la tarjeta va al final del último clip de video
+  real (si no hay ninguno, no va).
+- **Narración (R2):** los textos de la pista «voz» se conservan (CapCut los convierte en voz); sobre video real van
+  donde siempre (`transform_y = -0.42`) y, si tocan una escena, bajan a la franja libre de abajo (`transform_y = -0.74`,
+  centro en y ≈ 1670) para no tapar los textos de la escena. La música sigue igual sobre todo el reel.
 - `ReelStudio.spec`: agrega `('escenas', 'escenas')` a `datas`.
 
 ### E. Interfaz — `studio.html` / `studio_web.py`

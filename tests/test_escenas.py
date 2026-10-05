@@ -72,6 +72,28 @@ def test_validar_nombre_corto_y_mayusculas():
     assert r and r["precio"] == 5.5 and r["imagen"] == ""
 
 
+def test_nombre_corto_ambiguo_no_vale_y_el_completo_si():
+    precios = PRECIOS + [{"nombre": "KZ Castor Pro (Bass)", "precio": 14.0}]
+    d = {"producto": "KZ Castor Pro", "precio": 13, "detalle": "x"}
+    assert es.validar_escena("precio", d, precios) is None  # «KZ Castor Pro» es Harman o Bass: ambiguo
+    assert es.ambiguos("kz castor pro", precios) == ["KZ Castor Pro (Harman)", "KZ Castor Pro (Bass)"]
+    assert es.ambiguos("KZ Castor Pro (Bass)", precios) == []
+    r = es.validar_escena("precio", dict(d, producto="KZ Castor Pro (Bass)", precio=14), precios)
+    assert r["precio"] == 14 and r["imagen"] == "kz-castor-pro-bass.webp"
+    assert es._imagen_de("KZ Castor Pro") == ""  # en mapa.json también es ambiguo
+    # un producto cuyo nombre completo ES el corto de otro gana por coincidencia exacta
+    precios.append({"nombre": "KZ Castor Pro", "precio": 11.0})
+    assert es.validar_escena("precio", dict(d, precio=11), precios)["precio"] == 11
+
+
+def test_nombre_para_escena():
+    largo = [{"nombre": "Audífonos Inalámbricos Premium X (Edición Negra)", "precio": 30.0}]
+    assert es.nombre_para_escena("KZ Castor Pro (Harman)", PRECIOS) == "KZ Castor Pro (Harman)"
+    assert es.nombre_para_escena(largo[0]["nombre"], largo) == "Audífonos Inalámbricos Premium X"
+    otro = largo + [{"nombre": "Audífonos Inalámbricos Premium X (Edición Blanca)", "precio": 31.0}]
+    assert es.nombre_para_escena(largo[0]["nombre"], otro) == largo[0]["nombre"]  # el corto sería ambiguo
+
+
 def test_validar_imagen_nunca_del_input():
     d = {"producto": "Producto Libre", "para": "gamers", "imagen": "productos/kz-castor-pro-bass.webp"}
     r = es.validar_escena("para_quien", d, PRECIOS)
@@ -97,10 +119,28 @@ def test_validar_tipo_desconocido():
 
 
 # ---------------------------------------------------------------- render
+class _Proc:
+    """Popen simulado: communicate() devuelve la salida o se pasa del tiempo (hasta que lo matan)."""
+    pid = 4321
+
+    def __init__(self, ej, cmd):
+        self.ej, self.cmd, self.returncode, self.matado = ej, cmd, None, False
+
+    def communicate(self, timeout=None):
+        self.ej.timeouts.append(timeout)
+        if self.ej.colgado and not self.matado:
+            raise subprocess.TimeoutExpired(self.cmd, timeout)
+        self.returncode = self.ej.rc
+        return self.ej.out, ""
+
+    def kill(self):
+        self.matado = True
+
+
 class _Ejec:
-    def __init__(self, rc=0, out="", crear=True):
-        self.llamadas = []
-        self.rc, self.out, self.crear = rc, out, crear
+    def __init__(self, rc=0, out="", crear=True, colgado=False):
+        self.llamadas, self.timeouts, self.procs = [], [], []
+        self.rc, self.out, self.crear, self.colgado = rc, out, crear, colgado
 
     def __call__(self, cmd, **kw):
         self.llamadas.append((cmd, kw))
@@ -108,15 +148,16 @@ class _Ejec:
         self.html = open(os.path.join(tmp, "index.html"), encoding="utf-8").read()
         self.vars = json.load(open(os.path.join(tmp, "vars.json"), encoding="utf-8"))
         self.tiene = {d: os.path.isdir(os.path.join(tmp, d)) for d in ("fonts", "vendor", "productos")}
-        if self.crear:
+        if self.crear and not self.colgado:
             with open(cmd[cmd.index("--output") + 1], "wb") as f:
                 f.write(b"mp4")
-        return subprocess.CompletedProcess(cmd, self.rc, self.out, "")
+        self.procs.append(_Proc(self, cmd))
+        return self.procs[-1]
 
 
 def test_render_comando_cwd_vars_y_duracion(monkeypatch, tmp_path):
     ej = _Ejec()
-    monkeypatch.setattr(es.subprocess, "run", ej)
+    monkeypatch.setattr(es.subprocess, "Popen", ej)
     monkeypatch.setattr(es.shutil, "which", lambda n: "C:/n/npx.cmd")
     datos = es.validar_escena("para_quien", {"producto": "KZ Castor Pro (Bass)", "para": "bajos"}, PRECIOS)
     ruta = es.render("para_quien", datos, str(tmp_path), dur=6.4)
@@ -124,7 +165,7 @@ def test_render_comando_cwd_vars_y_duracion(monkeypatch, tmp_path):
     assert cmd[1:5] == ["--yes", "hyperframes@0.8.77", "render", "--variables-file"]
     assert cmd[5] == "vars.json" and cmd[6:8] == ["--quality", "looks"]
     assert os.path.isabs(cmd[cmd.index("--output") + 1])
-    assert kw["timeout"] == 300 and os.path.isabs(kw["cwd"])
+    assert ej.timeouts == [300] and os.path.isabs(kw["cwd"])
     assert 'data-duration="6.4"' in ej.html
     assert ej.vars["imagen"] == "productos/kz-castor-pro-bass.webp"
     assert all(ej.tiene.values())
@@ -133,7 +174,7 @@ def test_render_comando_cwd_vars_y_duracion(monkeypatch, tmp_path):
 
 def test_render_sin_imagen_pasa_cadena_vacia(monkeypatch, tmp_path):
     ej = _Ejec()
-    monkeypatch.setattr(es.subprocess, "run", ej)
+    monkeypatch.setattr(es.subprocess, "Popen", ej)
     monkeypatch.setattr(es.shutil, "which", lambda n: "npx")
     es.render("para_quien", {"producto": "Otro", "para": "x", "imagen": ""}, str(tmp_path))
     assert ej.vars["imagen"] == "" and not ej.tiene["productos"]
@@ -141,7 +182,7 @@ def test_render_sin_imagen_pasa_cadena_vacia(monkeypatch, tmp_path):
 
 def test_render_cache_evita_subprocess(monkeypatch, tmp_path):
     ej = _Ejec()
-    monkeypatch.setattr(es.subprocess, "run", ej)
+    monkeypatch.setattr(es.subprocess, "Popen", ej)
     monkeypatch.setattr(es.shutil, "which", lambda n: "npx")
     a = es.render("cta", {"linea": "Hola"}, str(tmp_path))
     b = es.render("cta", {"linea": "Hola"}, str(tmp_path))
@@ -152,7 +193,7 @@ def test_render_cache_evita_subprocess(monkeypatch, tmp_path):
 
 def test_render_error_con_ultimas_lineas(monkeypatch, tmp_path):
     salida = "\n".join("linea %d" % i for i in range(40))
-    monkeypatch.setattr(es.subprocess, "run", _Ejec(rc=1, out=salida, crear=False))
+    monkeypatch.setattr(es.subprocess, "Popen", _Ejec(rc=1, out=salida, crear=False))
     monkeypatch.setattr(es.shutil, "which", lambda n: "npx")
     with pytest.raises(RuntimeError) as e:
         es.render("cta", {"linea": "x"}, str(tmp_path))
@@ -161,19 +202,101 @@ def test_render_error_con_ultimas_lineas(monkeypatch, tmp_path):
 
 def test_render_sin_internet_mensaje_propio(monkeypatch, tmp_path):
     out = "npm error code ENOTFOUND\nnpm error request to https://registry.npmjs.org/hyperframes failed"
-    monkeypatch.setattr(es.subprocess, "run", _Ejec(rc=1, out=out, crear=False))
+    monkeypatch.setattr(es.subprocess, "Popen", _Ejec(rc=1, out=out, crear=False))
     monkeypatch.setattr(es.shutil, "which", lambda n: "npx")
     with pytest.raises(RuntimeError, match="HyperFrames no está descargado; conéctate a internet una vez"):
         es.render("cta", {"linea": "x"}, str(tmp_path))
 
 
-def test_render_timeout(monkeypatch, tmp_path):
-    def boom(cmd, **kw):
-        raise subprocess.TimeoutExpired(cmd, 300)
-    monkeypatch.setattr(es.subprocess, "run", boom)
+def test_render_timeout_mata_el_arbol(monkeypatch, tmp_path):
+    ej = _Ejec(colgado=True)
+    matados = []
+    monkeypatch.setattr(es.subprocess, "Popen", ej)
+    monkeypatch.setattr(es.subprocess, "run", lambda cmd, **kw: matados.append((cmd, kw)))
     monkeypatch.setattr(es.shutil, "which", lambda n: "npx")
+    monkeypatch.setattr(es.sys, "platform", "win32")
+    with pytest.raises(RuntimeError, match="tardó más de 300 s"):
+        es.render("cta", {"linea": "x"}, str(tmp_path))
+    assert ej.timeouts[0] == 300 and len(ej.timeouts) == 2  # tras matar, se recogen las tuberías
+    assert matados and matados[0][0] == ["taskkill", "/T", "/F", "/PID", "4321"]
+    assert matados[0][1]["creationflags"] == 0x08000000
+    assert ej.procs[0].matado
+    assert not [f for f in os.listdir(tmp_path) if f.endswith((".mp4", ".part"))]
+
+
+def test_render_timeout_fuera_de_windows_solo_kill(monkeypatch, tmp_path):
+    ej = _Ejec(colgado=True)
+    matados = []
+    monkeypatch.setattr(es.subprocess, "Popen", ej)
+    monkeypatch.setattr(es.subprocess, "run", lambda cmd, **kw: matados.append(cmd))
+    monkeypatch.setattr(es.shutil, "which", lambda n: "npx")
+    monkeypatch.setattr(es.sys, "platform", "linux")
     with pytest.raises(RuntimeError, match="300"):
         es.render("cta", {"linea": "x"}, str(tmp_path))
+    assert matados == [] and ej.procs[0].matado
+    assert "creationflags" not in ej.llamadas[0][1]
+
+
+def test_render_y_node_sin_ventana_en_windows(monkeypatch, tmp_path):
+    ej = _Ejec()
+    monkeypatch.setattr(es.subprocess, "Popen", ej)
+    monkeypatch.setattr(es.shutil, "which", lambda n: n)
+    monkeypatch.setattr(es.sys, "platform", "win32")
+    es.render("cta", {"linea": "x"}, str(tmp_path))
+    assert ej.llamadas[0][1]["creationflags"] == 0x08000000
+    vistos = []
+    monkeypatch.setattr(es.subprocess, "run",
+                        lambda cmd, **kw: (vistos.append(kw), subprocess.CompletedProcess(cmd, 0, "v22.3.0\n", ""))[1])
+    assert es.disponible() == (True, "")
+    assert vistos[0]["creationflags"] == 0x08000000
+
+
+def _destino(tmp_path, tipo, datos):
+    return os.path.join(str(tmp_path), es._clave(tipo, datos, es.duracion(tipo, datos))[:24] + ".mp4")
+
+
+def test_render_reusa_destino_si_aparece_durante_el_render(monkeypatch, tmp_path):
+    datos = {"linea": "x"}
+    destino = _destino(tmp_path, "cta", datos)
+
+    class _Otro(_Ejec):
+        def __call__(self, cmd, **kw):
+            p = super().__call__(cmd, **kw)
+            with open(destino, "wb") as f:  # otro render simultáneo de la misma escena terminó antes
+                f.write(b"otro")
+            return p
+    monkeypatch.setattr(es.subprocess, "Popen", _Otro())
+    monkeypatch.setattr(es.shutil, "which", lambda n: "npx")
+    assert es.render("cta", datos, str(tmp_path)) == destino
+    assert open(destino, "rb").read() == b"otro"
+    assert not [f for f in os.listdir(tmp_path) if f.endswith(".part")]
+
+
+def test_render_tolera_permission_error_con_destino_existente(monkeypatch, tmp_path):
+    datos = {"linea": "y"}
+    destino = _destino(tmp_path, "cta", datos)
+
+    def replace(a, b):
+        with open(destino, "wb") as f:
+            f.write(b"otro")
+        raise PermissionError("en uso")
+    monkeypatch.setattr(es.subprocess, "Popen", _Ejec())
+    monkeypatch.setattr(es.shutil, "which", lambda n: "npx")
+    monkeypatch.setattr(es.os, "replace", replace)
+    assert es.render("cta", datos, str(tmp_path)) == destino
+    assert not [f for f in os.listdir(tmp_path) if f.endswith(".part")]
+
+
+def test_clave_incluye_version_de_hyperframes_e_imagen(monkeypatch):
+    datos = es.validar_escena("para_quien", {"producto": "KZ Castor Pro (Bass)", "para": "bajos"}, PRECIOS)
+    assert es._huella_imagen(datos)  # la imagen del producto existe y entra en la clave
+    a = es._clave("para_quien", datos, 6.0)
+    monkeypatch.setattr(es, "HYPERFRAMES", "9.9.9")
+    assert es._clave("para_quien", datos, 6.0) != a
+    monkeypatch.setattr(es, "HYPERFRAMES", "0.8.77")
+    assert es._clave("para_quien", datos, 6.0) == a
+    monkeypatch.setattr(es, "_huella_imagen", lambda d: "otra-foto")
+    assert es._clave("para_quien", datos, 6.0) != a
 
 
 # ---------------------------------------------------------------- disponible
@@ -203,6 +326,13 @@ def test_disponible_node_viejo_sin_node_o_sin_ffmpeg(monkeypatch):
     _simular(monkeypatch, "v22.0.0", ffmpeg=False)
     ok, motivo = es.disponible()
     assert not ok and "FFmpeg" in motivo
+
+
+def test_disponible_motivo_pide_reiniciar(monkeypatch):
+    _simular(monkeypatch, "v20.0.0")
+    assert "reinicia Reel Studio" in es.disponible()[1]
+    _simular(monkeypatch, "v22.0.0", ffmpeg=False)
+    assert "reinicia Reel Studio" in es.disponible()[1]
 
 
 def test_disponible_cacheado(monkeypatch):
