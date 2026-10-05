@@ -373,6 +373,7 @@ dialog#ollamaBuscar::backdrop{background:rgba(0,0,0,.72)}
       <button class="chip" data-c="embedding" aria-pressed="false">Embedding</button>
     </div>
     <div id="oNota" class="onota" hidden></div>
+    <div id="oMsg" class="onota" role="alert" hidden></div>
     <div id="oJob" class="help" role="status" aria-live="polite" hidden></div>
     <div id="oRes" class="ores" aria-live="polite"></div>
   </div>
@@ -962,12 +963,14 @@ const oInstalado = (n, tag) => {
   const nom = new Set(((S.modelos || [])).map(m => m[0]));
   return tag ? nom.has(`${n}:${tag}`) : (nom.has(n) || nom.has(n + ":latest"));
 };
-const oNombre = m => { const t = O.sel[m.nombre]; return t ? `${m.nombre}:${t}` : m.nombre; };
+const oSel = m => O.sel[m.nombre] ?? (m.cloud && !(m.tamanos || []).length ? "cloud" : "");
+const oNombre = m => { const t = oSel(m); return t ? `${m.nombre}:${t}` : m.nombre; };
+const oMsg = (txt, err=true) => { const e = $("#oMsg"); e.textContent = txt || ""; e.hidden = !txt; e.style.color = err ? "var(--bad, #e5484d)" : ""; };
 function oRender(){
   const r = $("#oRes");
   if (!O.lista.length){ r.innerHTML = '<div class="help">Sin resultados.</div>'; return; }
   r.innerHTML = O.lista.map((m, i) => {
-    const t = O.sel[m.nombre] || "", inst = oInstalado(m.nombre, t);
+    const t = oSel(m), inst = oInstalado(m.nombre, t);
     const chips = [...(m.tamanos || []), ...(m.cloud ? ["cloud"] : [])].map(x =>
       `<button class="chip sm" data-i="${i}" data-t="${esc(x)}" aria-pressed="${t === x}">${esc(x)}</button>`).join("");
     const caps = (m.capacidades || []).map(c => `<span class="otag">${esc(c)}</span>`).join("");
@@ -975,7 +978,7 @@ function oRender(){
       <p>${esc(m.descripcion)}</p>
       <div class="meta">${caps}${m.pulls ? `<span>${esc(m.pulls)} descargas</span>` : ""}</div>
       <div class="acc">${chips ? `<span class="help" id="ot${i}">Tamaño:</span>${chips}` : ""}
-        <button class="btn sm" data-dl="${i}"${inst ? " disabled" : ""}>${m.cloud && t === "cloud" ? "Agregar" : "Descargar"}</button></div></div>`;
+        <button class="btn sm" data-dl="${i}"${inst || S.job?.corriendo ? " disabled" : ""}>${t === "cloud" ? "Agregar" : "Descargar"}</button></div></div>`;
   }).join("");
 }
 async function oBuscar(){
@@ -1000,24 +1003,26 @@ document.querySelector(".ofilt").onclick = e => {
 };
 $("#oRes").onclick = async e => {
   const c = e.target.closest("[data-t]");
-  if (c){ const m = O.lista[+c.dataset.i]; O.sel[m.nombre] = O.sel[m.nombre] === c.dataset.t ? "" : c.dataset.t; oRender(); return; }
+  if (c){ const m = O.lista[+c.dataset.i]; O.sel[m.nombre] = oSel(m) === c.dataset.t ? "" : c.dataset.t; oRender(); return; }
   const b = e.target.closest("[data-dl]"); if (!b) return;
   const m = O.lista[+b.dataset.dl];
   try{
     const r = await fetch("/api/ollama/descargar", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({modelo:oNombre(m)})});
     const d = await r.json();
-    if (r.status === 409) toast("Ya hay una tarea en curso.", true);
-    else if (!d.ok) toast(d.error || "No se pudo descargar el modelo.", true);
-    else toast("Descargando " + oNombre(m) + "…");
-  }catch(err){ toast("No se pudo descargar el modelo.", true); }
+    if (r.status === 409) oMsg("Ya hay una tarea en curso. Espera a que termine.");
+    else if (!d.ok) oMsg(d.error || "No se pudo descargar el modelo.");
+    else oMsg("Descargando " + oNombre(m) + "…", false);
+  }catch(err){ oMsg("No se pudo descargar el modelo."); }
   poll();
 };
-let oWas = false;
+let oWas = false, oBusy = false;
 function renderOllama(d){
   const j = d.job, run = j.corriendo && j.tarea === "descargar_modelo", el = $("#oJob");
   el.hidden = !run; if (run) el.textContent = (j.mensaje || "Descargando…") + (j.total ? ` (${j.hecho}/${j.total})` : "");
-  if (oWas && !run){ delete $("#sVision").dataset.loaded; if ($("#ollamaBuscar").open) oRender(); }
-  oWas = run;
+  if (oWas && !run) delete $("#sVision").dataset.loaded;
+  const busy = !!j.corriendo;
+  if ((oWas && !run) || busy !== oBusy){ if (run || busy) oMsg(""); if ($("#ollamaBuscar").open) oRender(); }
+  oWas = run; oBusy = busy;
 }
 
 /* ---------- polling ---------- */
