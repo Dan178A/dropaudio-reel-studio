@@ -10,12 +10,15 @@ from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs
 
 import reel_studio as core
+import rutas
+import version
 
 PUERTO = 8765
 # BASE: donde viven tus datos (config, carpeta de videos). RES: archivos de la app (html). Iguales salvo en el .exe.
-BASE = os.path.dirname(sys.executable) if getattr(sys, "frozen", False) else os.path.dirname(os.path.abspath(__file__))
-RES = getattr(sys, "_MEIPASS", BASE)
+BASE = rutas.datos()
+RES = getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__)))
 AQUI = BASE
+rutas.migrar_datos()
 CFG_FILE = os.path.join(BASE, "studio_config.json")
 
 CFG = {"carpeta": os.path.join(AQUI, "Videos Dropaudioccs"), "vision": "gemma3:4b", "jev": "nimble:latest",
@@ -286,7 +289,7 @@ class H(BaseHTTPRequestHandler):
             v = int(q.get("av", ["-1"])[0]); gv = int(q.get("gv", ["-1"])[0]); ev = int(q.get("ev", ["-1"])[0])
             with LOCK:
                 job = dict(JOB); log = LOG[-120:]
-            out = {"cfg": CFG, "archivos": archivos(), "modelos": ESTADO["modelos"], "job": job, "log": log,
+            out = {"version": version.__version__, "cfg": CFG, "archivos": archivos(), "modelos": ESTADO["modelos"], "job": job, "log": log,
                    "borrador": ESTADO["borrador"], "analisis_v": ESTADO["analisis_v"], "guion_v": ESTADO["guion_v"],
                    "etiq_v": ESTADO["etiq_v"],
                    "ahora": time.time()}

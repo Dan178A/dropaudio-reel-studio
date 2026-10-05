@@ -226,7 +226,7 @@ dialog#visor::backdrop{background:rgba(0,0,0,.72)}
 <aside aria-label="Proyecto y modelos">
   <div class="brand">
     <svg width="38" height="38" viewBox="0 0 24 24" style="color:var(--gold)"><use href="#i-wave"/></svg>
-    <div><b>Reel Studio</b><small>DropAudio CCS · CapCut + Ollama</small></div>
+    <div><b>Reel Studio</b><small id="verApp">DropAudio CCS · CapCut + Ollama</small></div>
   </div>
 
   <section>
@@ -894,6 +894,7 @@ async function poll(){
   try{
     const d = await api(`/api/estado?av=${S.av}&gv=${S.gv}&ev=${S.ev}${S.fmts ? "" : "&fmt=1"}`);
     S.cfg = d.cfg; S.job = d.job;
+    if (d.version) $("#verApp").textContent = "DropAudio CCS · v" + d.version;
     if (S.catPend) S.cfg.catalogo = S.catLocal;
     let tomasCambio = false;
     if ("analisis" in d){ S.analisis = d.analisis; S.av = d.analisis_v; tomasCambio = true; }

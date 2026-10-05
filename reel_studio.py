@@ -13,6 +13,7 @@ Instalar (una vez):  pip install faster-whisper pillow pillow-heif numpy
                      pip install -e C:\\Users\\DAN_PC\\Documents\\GitHub\\pyCapCut
 Ejecutar:            python reel_studio.py
 """
+import rutas
 import json, os, sys, queue, re, subprocess, threading, time, urllib.request, urllib.error, base64, tempfile
 
 OLLAMA = os.environ.get("OLLAMA_HOST", "http://localhost:11434")
@@ -1146,7 +1147,7 @@ def interfaz():
 
     cola = queue.Queue()
     v = {k: tk.StringVar(value=x) for k, x in {
-        "carpeta": os.path.join(AQUI, "Videos Dropaudioccs"), "vision": "gemma3:4b", "jev": "nimble:latest",
+        "carpeta": os.path.join(rutas.datos(), "Videos Dropaudioccs"), "vision": "gemma3:4b", "jev": "nimble:latest",
         "escritor": "glm-5.3:cloud", "whisper": "small", "nombre": "reel_auto_01", "drafts": CAPCUT_DRAFTS,
         "estado": "Elige una carpeta y pulsa Analizar."}.items()}
     paso, minimo = tk.DoubleVar(value=3.0), tk.DoubleVar(value=0.5)
