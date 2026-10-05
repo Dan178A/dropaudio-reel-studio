@@ -1,0 +1,157 @@
+<!doctype html>
+<html
+  lang="es"
+  data-composition-variables='[
+    {"id":"producto","type":"string","label":"Producto","default":"KZ Castor Pro (Bass)","maxLength":32},
+    {"id":"para","type":"string","label":"Para quién es","default":"Si quieres bajos que se sienten, sin perder las voces","maxLength":60},
+    {"id":"imagen","type":"string","label":"Imagen del producto (opcional)","default":"productos/kz-castor-pro-bass.webp"}
+  ]'
+>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1080, height=1920" />
+    <title>DropAudio CCS · Escena para quién</title>
+    <script src="vendor/gsap.min.js"></script>
+    <style>
+      @font-face { font-family: "Space Grotesk"; src: url("fonts/space-grotesk-latin-700-normal.woff2") format("woff2"); font-weight: 700; }
+      @font-face { font-family: "Plus Jakarta Sans"; src: url("fonts/plus-jakarta-sans-latin-600-normal.woff2") format("woff2"); font-weight: 600; }
+      @font-face { font-family: "Plus Jakarta Sans"; src: url("fonts/plus-jakarta-sans-latin-700-normal.woff2") format("woff2"); font-weight: 700; }
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body { width: 1080px; height: 1920px; overflow: hidden; background: #090807; }
+      #root { position: relative; width: 100%; height: 100%; overflow: hidden; background: #090807; color: #f0ede8; font-family: "Plus Jakarta Sans", sans-serif; }
+      .capa { position: absolute; inset: 0; }
+      /* Acabado (pseudo-elementos para no tapar el texto ante el auditor): viñeta y grano */
+      #fondo { background: radial-gradient(120% 75% at 50% 40%, #1a150d 0%, #0c0b09 55%, #090807 100%); }
+      #resplandor { position: absolute; left: 90px; top: 300px; width: 900px; height: 900px; border-radius: 50%; background: #cda860; opacity: 0.16; filter: blur(190px); }
+      .polvo { position: absolute; border-radius: 50%; background: #e7c98a; }
+      #root::after { content: ""; position: absolute; inset: 0; z-index: 10; pointer-events: none; background: radial-gradient(95% 70% at 50% 48%, rgba(0,0,0,0) 52%, rgba(0,0,0,0.78) 100%); }
+      #root::before { content: ""; position: absolute; inset: -40px; z-index: 11; pointer-events: none; opacity: 0.07; mix-blend-mode: overlay;
+        background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='220' height='220'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>"); }
+      #logo { position: absolute; top: 210px; left: 0; right: 0; display: flex; justify-content: center; align-items: center; gap: 14px; font-family: "Space Grotesk", sans-serif; font-weight: 700; font-size: 34px; letter-spacing: -0.02em; }
+      #logo svg { width: 44px; height: 44px; display: block; }
+      #logo .p { color: #cda860; }
+      #escenario { position: absolute; left: 70px; right: 70px; top: 300px; bottom: 400px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
+      #prod-caja { position: relative; width: 700px; height: 430px; perspective: 1400px; }
+      #halo { position: absolute; left: 50%; top: 50%; width: 600px; height: 600px; margin: -300px 0 0 -300px; border-radius: 50%; background: radial-gradient(circle, rgba(240,237,232,0.20), rgba(205,168,96,0.10) 45%, rgba(0,0,0,0) 70%); }
+      #prod-giro { position: absolute; inset: 0; transform-style: preserve-3d; }
+      #prod { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; filter: drop-shadow(0 46px 60px rgba(0,0,0,0.85)) drop-shadow(0 0 46px rgba(226,190,114,0.22)); }
+      #brillo-mask { position: absolute; inset: 0; overflow: hidden; -webkit-mask-size: contain; mask-size: contain; -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat; -webkit-mask-position: center; mask-position: center; }
+      #brillo { position: absolute; top: -20%; left: 0; width: 20%; height: 140%; mix-blend-mode: screen; background: linear-gradient(100deg, rgba(255,240,205,0) 0%, rgba(255,240,205,0.38) 50%, rgba(255,240,205,0) 100%); }
+      #nombre { margin-top: 26px; font-family: "Space Grotesk", sans-serif; font-weight: 700; font-size: 60px; line-height: 1.05; letter-spacing: -0.035em; color: #cda860; max-width: 900px; }
+      #etiqueta { margin-top: 44px; display: inline-flex; align-items: center; gap: 16px; padding: 14px 30px; border-radius: 999px; background: #cda860; color: #14110c; font-family: "Space Grotesk", sans-serif; font-weight: 700; font-size: 34px; letter-spacing: 0.2em; padding-left: calc(30px + 0.2em); }
+      #para { margin-top: 34px; max-width: 920px; font-family: "Space Grotesk", sans-serif; font-weight: 700; font-size: 84px; line-height: 1.06; letter-spacing: -0.04em; }
+      #para-raya { width: 260px; height: 8px; border-radius: 4px; margin-top: 40px; background: linear-gradient(90deg, rgba(205,168,96,0), #e2be72, rgba(205,168,96,0)); }
+      #root.sin-imagen #prod-caja { display: none; }
+      #root.sin-imagen #nombre { font-size: 76px; }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="7" data-width="1080" data-height="1920">
+      <div id="fondo" class="capa"><div id="resplandor"></div><div id="polvo" class="capa"></div></div>
+
+      <div id="logo">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#cda860" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12h3l2-6 4 14 4-18 3 10h4" /></svg>
+        <span>DropAudio<span class="p">·</span>CCS</span>
+      </div>
+
+      <div id="escenario">
+        <div id="prod-caja">
+          <div id="halo"></div>
+          <div id="prod-giro">
+            <img id="prod" data-var-src="imagen" src="productos/kz-castor-pro-bass.webp" alt="" />
+            <div id="brillo-mask"><div id="brillo" data-layout-allow-overflow></div></div>
+          </div>
+        </div>
+        <div id="nombre" data-var-text="producto">KZ Castor Pro (Bass)</div>
+        <div id="etiqueta">¿ES PARA TI?</div>
+        <div id="para" data-var-text="para">Si quieres bajos que se sienten, sin perder las voces</div>
+        <div id="para-raya"></div>
+      </div>
+
+    </div>
+
+    <script>
+      // La duración total sale del data-duration del root (Reel Studio lo reescribe antes de renderizar).
+      const root = document.getElementById("root");
+      const D = Math.max(3, parseFloat(root.dataset.duration) || 7);
+      const V = (window.__hyperframes && window.__hyperframes.getVariables) ? window.__hyperframes.getVariables() : {};
+      const producto = String(V.producto != null ? V.producto : "KZ Castor Pro (Bass)");
+      const para = String(V.para != null ? V.para : "");
+      const imagen = String(V.imagen != null ? V.imagen : "productos/kz-castor-pro-bass.webp").trim();
+
+      function prng(seed) { let s = seed >>> 0; return () => ((s = (s * 1664525 + 1013904223) >>> 0) / 4294967296); }
+      // Reduce el tamaño de letra hasta que el texto quepa en maxLineas (mide sin padding ni borde; solo al armar).
+      function ajustar(el, px, minPx, maxLineas, lh) {
+        const alto = () => {
+          const cs = getComputedStyle(el);
+          return el.getBoundingClientRect().height - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom) - parseFloat(cs.borderTopWidth) - parseFloat(cs.borderBottomWidth);
+        };
+        el.style.fontSize = px + "px";
+        while (px > minPx && alto() > px * lh * maxLineas + 2) { px -= 4; el.style.fontSize = px + "px"; }
+        return px;
+      }
+
+      function construir() {
+        const conImagen = imagen !== "";
+        if (!conImagen) root.classList.add("sin-imagen");
+        document.getElementById("nombre").textContent = producto;
+        document.getElementById("para").textContent = para;
+        if (conImagen) {
+          document.getElementById("prod").setAttribute("src", imagen);
+          const m = document.getElementById("brillo-mask");
+          m.style.webkitMaskImage = m.style.maskImage = 'url("' + imagen + '")';
+        }
+        ajustar(document.getElementById("nombre"), conImagen ? 60 : 76, 44, 2, 1.05);
+        ajustar(document.getElementById("para"), conImagen ? 84 : 100, 56, conImagen ? 3 : 4, 1.06);
+
+        const rnd = prng(31), polvo = [];
+        const campo = document.getElementById("polvo");
+        for (let i = 0; i < 34; i++) {
+          const d = document.createElement("div"); d.className = "polvo";
+          const sz = 2.5 + rnd() * 6; d.style.width = d.style.height = sz.toFixed(1) + "px";
+          d.style.left = (rnd() * 1080).toFixed(0) + "px"; d.style.top = (120 + rnd() * 1750).toFixed(0) + "px";
+          d.style.opacity = (0.12 + rnd() * 0.4).toFixed(2);
+          if (sz > 6.5) d.style.filter = "blur(2px)";
+          d.dataset.dy = (90 + rnd() * 260).toFixed(0); d.dataset.dx = ((rnd() - 0.5) * 90).toFixed(0);
+          campo.appendChild(d); polvo.push(d);
+        }
+
+        const tl = gsap.timeline({ paused: true });
+        const EX = "expo.out";
+        const SALIDA = 0.5, tSal = D - SALIDA;
+
+        polvo.forEach((d) => tl.fromTo(d, { x: 0, y: 0 }, { x: +d.dataset.dx, y: -d.dataset.dy, duration: D, ease: "none" }, 0));
+        tl.fromTo("#resplandor", { opacity: 0.08, scale: 0.9 }, { opacity: 0.18, scale: 1.05, duration: D, ease: "sine.inOut" }, 0);
+        tl.fromTo("#escenario", { scale: 1 }, { scale: 1.03, duration: D, ease: "none" }, 0);
+
+        tl.fromTo("#logo", { opacity: 0, y: -24 }, { opacity: 1, y: 0, duration: 0.6, ease: EX }, 0.05);
+        let t = 0.2;
+        if (conImagen) {
+          tl.fromTo("#halo", { opacity: 0, scale: 0.5 }, { opacity: 1, scale: 1, duration: 1.0, ease: EX }, 0.1);
+          tl.fromTo("#prod-giro", { opacity: 0, y: 160, rotationY: -75, rotationX: 18, scale: 0.85 }, { opacity: 1, y: 0, rotationY: 0, rotationX: 0, scale: 1, duration: 1.2, ease: EX }, 0.15);
+          t = 0.6;
+        }
+        tl.fromTo("#nombre", { opacity: 0, y: 40 }, { opacity: 1, y: 0, duration: 0.7, ease: EX }, t);
+        tl.fromTo("#etiqueta", { opacity: 0, scale: 0.7 }, { opacity: 1, scale: 1, duration: 0.6, ease: "back.out(2)" }, t + 0.35);
+        const tPara = t + 0.7;
+        tl.fromTo("#para", { opacity: 0, y: 70, filter: "blur(14px)" }, { opacity: 1, y: 0, filter: "blur(0px)", duration: 0.9, ease: EX }, tPara);
+        tl.fromTo("#para-raya", { scaleX: 0, opacity: 0 }, { scaleX: 1, opacity: 1, duration: 0.9, ease: EX }, tPara + 0.5);
+        const tLeido = tPara + 0.9;
+
+        const sost = Math.max(0.5, tSal - tLeido);
+        if (conImagen) {
+          tl.to("#prod-giro", { y: -16, rotationY: -10, duration: sost + 0.4, ease: "sine.inOut" }, tLeido - 0.4);
+          tl.fromTo("#brillo", { xPercent: -120 }, { xPercent: 540, duration: Math.min(1.4, sost), ease: "power2.inOut" }, tLeido - 0.2);
+        }
+
+        tl.to(["#escenario", "#logo"], { opacity: 0, y: -50, filter: "blur(10px)", duration: SALIDA, ease: "power3.in" }, tSal);
+        window.__timelines["main"] = tl;
+      }
+
+      Promise.all([
+        document.fonts.load('700 100px "Space Grotesk"'),
+        document.fonts.load('600 40px "Plus Jakarta Sans"'),
+      ]).then(construir, construir);
+    </script>
+  </body>
+</html>

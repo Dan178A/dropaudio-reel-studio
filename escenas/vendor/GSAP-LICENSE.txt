@@ -1,0 +1,15 @@
+GSAP 3.14.2 (gsap.min.js)
+https://gsap.com
+
+Copyright (c) 2008-2025, GreenSock. All rights reserved.
+Subject to the terms at https://gsap.com/standard-license.
+
+Se redistribuye sin modificar, tal como lo publica GreenSock en npm (paquete "gsap",
+licencia declarada: Standard 'no charge' license: https://gsap.com/standard-license),
+conservando el aviso de copyright de la cabecera del archivo.
+
+La licencia estándar sin costo permite usar GSAP en cualquier sitio web, aplicación
+o interfaz digital, también con fines comerciales. Prohíbe usarlo en herramientas
+que permitan construir animaciones visuales sin código que compitan con las
+capacidades de animación visual de Webflow. Texto completo y vigente:
+https://gsap.com/standard-license

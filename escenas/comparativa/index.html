@@ -1,0 +1,213 @@
+<!doctype html>
+<html
+  lang="es"
+  data-composition-variables='[
+    {"id":"a_nombre","type":"string","label":"Opción A: nombre","default":"KZ EDX Pro X","maxLength":32},
+    {"id":"a_precio","type":"number","label":"Opción A: precio ($)","default":13,"min":0},
+    {"id":"a_punto","type":"string","label":"Opción A: punto fuerte","default":"Bajos potentes para el día a día","maxLength":48},
+    {"id":"b_nombre","type":"string","label":"Opción B: nombre","default":"KZ Castor (Bass)","maxLength":32},
+    {"id":"b_precio","type":"number","label":"Opción B: precio ($)","default":25,"min":0},
+    {"id":"b_punto","type":"string","label":"Opción B: punto fuerte","default":"Doble driver: más cuerpo y detalle","maxLength":48},
+    {"id":"veredicto","type":"string","label":"Veredicto","default":"Si vas empezando, el EDX. Si quieres más, el Castor.","maxLength":80}
+  ]'
+>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1080, height=1920" />
+    <title>DropAudio CCS · Escena comparativa</title>
+    <script src="vendor/gsap.min.js"></script>
+    <style>
+      @font-face { font-family: "Space Grotesk"; src: url("fonts/space-grotesk-latin-700-normal.woff2") format("woff2"); font-weight: 700; }
+      @font-face { font-family: "Plus Jakarta Sans"; src: url("fonts/plus-jakarta-sans-latin-600-normal.woff2") format("woff2"); font-weight: 600; }
+      @font-face { font-family: "Plus Jakarta Sans"; src: url("fonts/plus-jakarta-sans-latin-700-normal.woff2") format("woff2"); font-weight: 700; }
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body { width: 1080px; height: 1920px; overflow: hidden; background: #090807; }
+      #root { position: relative; width: 100%; height: 100%; overflow: hidden; background: #090807; color: #f0ede8; font-family: "Plus Jakarta Sans", sans-serif; }
+      .capa { position: absolute; inset: 0; }
+      /* Acabado (pseudo-elementos para no tapar el texto ante el auditor): viñeta y grano */
+      #fondo { background: radial-gradient(120% 75% at 50% 45%, #1a150d 0%, #0c0b09 55%, #090807 100%); }
+      #resplandor { position: absolute; left: 90px; top: 520px; width: 900px; height: 900px; border-radius: 50%; background: #cda860; opacity: 0.14; filter: blur(190px); }
+      .polvo { position: absolute; border-radius: 50%; background: #e7c98a; }
+      #root::after { content: ""; position: absolute; inset: 0; z-index: 10; pointer-events: none; background: radial-gradient(95% 70% at 50% 48%, rgba(0,0,0,0) 52%, rgba(0,0,0,0.78) 100%); }
+      #root::before { content: ""; position: absolute; inset: -40px; z-index: 11; pointer-events: none; opacity: 0.07; mix-blend-mode: overlay;
+        background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='220' height='220'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>"); }
+      #logo { position: absolute; top: 210px; left: 0; right: 0; display: flex; justify-content: center; align-items: center; gap: 14px; font-family: "Space Grotesk", sans-serif; font-weight: 700; font-size: 34px; letter-spacing: -0.02em; }
+      #logo svg { width: 44px; height: 44px; display: block; }
+      #logo .p { color: #cda860; }
+      #escenario { position: absolute; left: 60px; right: 60px; top: 300px; bottom: 400px; display: flex; flex-direction: column; align-items: stretch; justify-content: center; }
+      #kicker { text-align: center; font-family: "Space Grotesk", sans-serif; font-weight: 700; font-size: 32px; letter-spacing: 0.26em; padding-left: 0.26em; color: #cda860; margin-bottom: 34px; }
+      .tarjeta { position: relative; border-radius: 40px; padding: 44px 48px 46px; background: linear-gradient(160deg, rgba(34,29,21,0.96), rgba(18,16,12,0.96)); border: 3px solid rgba(205,168,96,0.32); box-shadow: 0 40px 90px rgba(0,0,0,0.55); overflow: hidden; }
+      .tarjeta.b { border-color: rgba(226,190,114,0.75); }
+      .cabeza { display: flex; align-items: center; justify-content: space-between; gap: 24px; }
+      .nombre { flex: 1; font-family: "Space Grotesk", sans-serif; font-weight: 700; font-size: 78px; line-height: 1.0; letter-spacing: -0.04em; }
+      .precio { flex: none; display: flex; align-items: flex-start; font-family: "Space Grotesk", sans-serif; font-weight: 700; font-size: 156px; line-height: 1; letter-spacing: -0.05em; color: #e2be72; }
+      .precio .moneda { font-size: 0.5em; margin-top: 0.1em; margin-right: 0.04em; color: #cda860; }
+      .col { position: relative; height: 1em; clip-path: inset(0 -60% 0 -60%); }
+      .tira { display: block; text-align: center; }
+      .tira span, .fijo { display: block; height: 1em; line-height: 1em; }
+      .punto { margin-top: 26px; display: flex; gap: 18px; align-items: flex-start; font-size: 46px; line-height: 1.25; font-weight: 600; color: #e6e0d6; }
+      .punto i { flex: none; width: 46px; height: 46px; margin-top: 4px; border-radius: 50%; background: #cda860; color: #14110c; font-style: normal; font-size: 28px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
+      #vs-fila { position: relative; height: 0; z-index: 2; }
+      #vs { position: absolute; left: 50%; top: -9px; width: 116px; height: 116px; margin-left: -58px; border-radius: 50%; background: #cda860; color: #14110c; display: flex; align-items: center; justify-content: center; font-family: "Space Grotesk", sans-serif; font-weight: 700; font-size: 48px; letter-spacing: -0.03em; box-shadow: 0 0 0 10px #0c0b09, 0 24px 60px rgba(0,0,0,0.6); }
+      #tarjeta-b { margin-top: 98px; }
+      #veredicto { margin-top: 44px; display: flex; gap: 22px; align-items: flex-start; padding: 34px 40px; border-radius: 32px; background: #f0ede8; color: #14110c; box-shadow: 0 40px 90px rgba(0,0,0,0.55); }
+      #veredicto .flecha { flex: none; font-family: "Space Grotesk", sans-serif; font-weight: 700; font-size: 58px; line-height: 1.12; color: #967337; }
+      #veredicto-txt { font-family: "Space Grotesk", sans-serif; font-weight: 700; font-size: 58px; line-height: 1.12; letter-spacing: -0.03em; }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="9" data-width="1080" data-height="1920">
+      <div id="fondo" class="capa"><div id="resplandor"></div><div id="polvo" class="capa"></div></div>
+
+      <div id="logo">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#cda860" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12h3l2-6 4 14 4-18 3 10h4" /></svg>
+        <span>DropAudio<span class="p">·</span>CCS</span>
+      </div>
+
+      <div id="escenario">
+        <div id="kicker">¿CUÁL TE CONVIENE?</div>
+        <div class="tarjeta a" id="tarjeta-a">
+          
+          <div class="cabeza"><div class="nombre" id="a-nombre" data-var-text="a_nombre">KZ EDX Pro X</div><div class="precio" id="a-precio"></div></div>
+          <div class="punto"><i>✓</i><span id="a-punto" data-var-text="a_punto">Bajos potentes para el día a día</span></div>
+        </div>
+        <div id="vs-fila"><div id="vs">VS</div></div>
+        <div class="tarjeta b" id="tarjeta-b">
+          
+          <div class="cabeza"><div class="nombre" id="b-nombre" data-var-text="b_nombre">KZ Castor (Bass)</div><div class="precio" id="b-precio"></div></div>
+          <div class="punto"><i>✓</i><span id="b-punto" data-var-text="b_punto">Doble driver: más cuerpo y detalle</span></div>
+        </div>
+        <div id="veredicto"><div class="flecha">→</div><div id="veredicto-txt" data-var-text="veredicto">Si vas empezando, el EDX. Si quieres más, el Castor.</div></div>
+      </div>
+
+    </div>
+
+    <script>
+      // La duración total sale del data-duration del root (Reel Studio lo reescribe antes de renderizar).
+      const root = document.getElementById("root");
+      const D = Math.max(3, parseFloat(root.dataset.duration) || 9);
+      const V = (window.__hyperframes && window.__hyperframes.getVariables) ? window.__hyperframes.getVariables() : {};
+      const val = (k, def) => String(V[k] != null ? V[k] : def);
+      const num = (k, def) => { const n = Number(V[k] != null ? V[k] : def); return isFinite(n) ? n : def; };
+      const T = {
+        a_nombre: val("a_nombre", "KZ EDX Pro X"), a_punto: val("a_punto", ""),
+        b_nombre: val("b_nombre", "KZ Castor (Bass)"), b_punto: val("b_punto", ""),
+        veredicto: val("veredicto", ""),
+      };
+      const PA = num("a_precio", 13), PB = num("b_precio", 25);
+
+      function prng(seed) { let s = seed >>> 0; return () => ((s = (s * 1664525 + 1013904223) >>> 0) / 4294967296); }
+      // Reduce el tamaño de letra hasta que el texto quepa en maxLineas (mide sin padding ni borde; solo al armar).
+      function ajustar(el, px, minPx, maxLineas, lh) {
+        const alto = () => {
+          const cs = getComputedStyle(el);
+          return el.getBoundingClientRect().height - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom) - parseFloat(cs.borderTopWidth) - parseFloat(cs.borderBottomWidth);
+        };
+        el.style.fontSize = px + "px";
+        while (px > minPx && alto() > px * lh * maxLineas + 2) { px -= 4; el.style.fontSize = px + "px"; }
+        return px;
+      }
+      const palabras = (s) => s.trim() ? s.trim().split(/\s+/).length : 0;
+
+      // Precio con tiras de dígitos; devuelve las tiras para animarlas.
+      function armarPrecio(el, precio) {
+        const txt = Number.isInteger(precio) ? String(precio) : precio.toFixed(2);
+        el.innerHTML = '<span class="fijo moneda">$</span>';
+        const tiras = [];
+        for (const ch of txt) {
+          const col = document.createElement("span"); col.className = "col";
+          if (/[0-9]/.test(ch)) {
+            const tira = document.createElement("span"); tira.className = "tira";
+            for (let k = 0; k < 20; k++) { const s = document.createElement("span"); s.textContent = String(k % 10); tira.appendChild(s); }
+            col.appendChild(tira); tiras.push({ tira, objetivo: 10 + Number(ch), col, ch });
+          } else { const f = document.createElement("span"); f.className = "fijo"; f.textContent = ch; col.appendChild(f); }
+          el.appendChild(col);
+        }
+        // Cada columna mide lo que mide su dígito final (el "1" no deja hueco).
+        tiras.forEach((o) => {
+          const m = document.createElement("span");
+          m.style.display = "inline-block"; m.textContent = o.ch;
+          el.appendChild(m); o.col.style.width = (m.getBoundingClientRect().width + 6) + "px"; el.removeChild(m);
+        });
+        return tiras;
+      }
+
+      function construir() {
+        for (const id of ["a_nombre", "a_punto", "b_nombre", "b_punto"]) document.getElementById(id.replace("_", "-")).textContent = T[id];
+        document.getElementById("veredicto-txt").textContent = T.veredicto;
+        if (!T.veredicto.trim()) document.getElementById("veredicto").style.display = "none";
+        const tirasA = armarPrecio(document.getElementById("a-precio"), PA);
+        const tirasB = armarPrecio(document.getElementById("b-precio"), PB);
+        ajustar(document.getElementById("a-nombre"), 78, 48, 2, 1.0);
+        ajustar(document.getElementById("b-nombre"), 78, 48, 2, 1.0);
+        ajustar(document.getElementById("a-punto"), 46, 34, 2, 1.25);
+        ajustar(document.getElementById("b-punto"), 46, 34, 2, 1.25);
+        ajustar(document.getElementById("veredicto-txt"), 58, 38, 3, 1.12);
+        // Si los textos son largos y el bloque no cabe en la zona segura, se quita el kicker (los datos mandan).
+        const esc = document.getElementById("escenario");
+        const kick = document.getElementById("kicker");
+        const altoBloque = () => {
+          const hijos = Array.from(esc.children).filter((h) => h.style.display !== "none");
+          return hijos[hijos.length - 1].getBoundingClientRect().bottom - hijos[0].getBoundingClientRect().top;
+        };
+        if (altoBloque() > esc.clientHeight) kick.style.display = "none";
+
+        const rnd = prng(11), polvo = [];
+        const campo = document.getElementById("polvo");
+        for (let i = 0; i < 30; i++) {
+          const d = document.createElement("div"); d.className = "polvo";
+          const sz = 2.5 + rnd() * 6; d.style.width = d.style.height = sz.toFixed(1) + "px";
+          d.style.left = (rnd() * 1080).toFixed(0) + "px"; d.style.top = (120 + rnd() * 1750).toFixed(0) + "px";
+          d.style.opacity = (0.12 + rnd() * 0.4).toFixed(2);
+          if (sz > 6.5) d.style.filter = "blur(2px)";
+          d.dataset.dy = (90 + rnd() * 260).toFixed(0); d.dataset.dx = ((rnd() - 0.5) * 90).toFixed(0);
+          campo.appendChild(d); polvo.push(d);
+        }
+
+        const tl = gsap.timeline({ paused: true });
+        const EX = "expo.out";
+        const SALIDA = 0.5, tSal = D - SALIDA;
+
+        polvo.forEach((d) => tl.fromTo(d, { x: 0, y: 0 }, { x: +d.dataset.dx, y: -d.dataset.dy, duration: D, ease: "none" }, 0));
+        tl.fromTo("#resplandor", { opacity: 0.07, scale: 0.9 }, { opacity: 0.16, scale: 1.05, duration: D, ease: "sine.inOut" }, 0);
+        tl.fromTo("#escenario", { scale: 1 }, { scale: 1.025, duration: D, ease: "none" }, 0);
+
+        // Reparto del tiempo: cada bloque (A, B, veredicto) recibe tiempo de lectura según sus palabras.
+        const wA = Math.max(3, palabras(T.a_nombre) + palabras(T.a_punto));
+        const wB = Math.max(3, palabras(T.b_nombre) + palabras(T.b_punto));
+        const wV = T.veredicto.trim() ? Math.max(3, palabras(T.veredicto)) : 0;
+        const inicio = 0.35, fin = tSal - 0.3;  // el último bloque debe quedar visible un rato
+        const total = wA + wB + wV;
+        const util = Math.max(2.4, fin - inicio);
+        const tA = inicio;
+        const tB = tA + Math.max(1.0, util * wA / total);
+        const tV = wV ? Math.min(fin - 1.2, tB + Math.max(1.0, util * wB / total)) : null;
+
+        tl.fromTo("#logo", { opacity: 0, y: -24 }, { opacity: 1, y: 0, duration: 0.6, ease: EX }, 0.05);
+        tl.fromTo("#kicker", { opacity: 0, y: 30 }, { opacity: 1, y: 0, duration: 0.7, ease: EX }, 0.1);
+
+        const entrar = (sel, tiras, t, desde) => {
+          tl.fromTo(sel, { opacity: 0, x: desde, rotationY: desde > 0 ? -18 : 18, transformPerspective: 1400 }, { opacity: 1, x: 0, rotationY: 0, duration: 0.9, ease: EX }, t);
+          tiras.forEach((o, i) => tl.fromTo(o.tira, { yPercent: 0 }, { yPercent: -o.objetivo * 5, duration: 1.1 + i * 0.2, ease: "expo.out" }, t + 0.15));
+          tl.fromTo(sel + " .punto", { opacity: 0, y: 24 }, { opacity: 1, y: 0, duration: 0.6, ease: EX }, t + 0.45);
+          tl.fromTo(sel + " .punto i", { scale: 0 }, { scale: 1, duration: 0.45, ease: "back.out(2.4)" }, t + 0.55);
+        };
+        entrar("#tarjeta-a", tirasA, tA, -160);
+        tl.fromTo("#vs", { opacity: 0, scale: 0, rotation: -160 }, { opacity: 1, scale: 1, rotation: 0, duration: 0.6, ease: "back.out(2)" }, tB - 0.25);
+        entrar("#tarjeta-b", tirasB, tB, 160);
+        if (tV !== null) {
+          tl.fromTo("#veredicto", { opacity: 0, y: 50, scale: 0.94 }, { opacity: 1, y: 0, scale: 1, duration: 0.7, ease: "back.out(1.5)" }, tV);
+          tl.fromTo("#veredicto .flecha", { x: -30 }, { x: 0, duration: 0.6, ease: EX }, tV + 0.2);
+        }
+
+        tl.to(["#escenario", "#logo"], { opacity: 0, y: -50, filter: "blur(10px)", duration: SALIDA, ease: "power3.in" }, tSal);
+        window.__timelines["main"] = tl;
+      }
+
+      Promise.all([
+        document.fonts.load('700 100px "Space Grotesk"'),
+        document.fonts.load('600 40px "Plus Jakarta Sans"'),
+      ]).then(construir, construir);
+    </script>
+  </body>
+</html>

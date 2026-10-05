@@ -1,0 +1,225 @@
+<!doctype html>
+<html
+  lang="es"
+  data-composition-variables='[
+    {"id":"producto","type":"string","label":"Producto","default":"KZ Castor Pro (Harman)","maxLength":32},
+    {"id":"precio","type":"number","label":"Precio ($)","default":28,"min":0},
+    {"id":"detalle","type":"string","label":"Detalle","default":"Doble driver y 4 modos de sonido","maxLength":40},
+    {"id":"imagen","type":"string","label":"Imagen del producto (opcional)","default":"productos/kz-castor-pro-harman.webp"}
+  ]'
+>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1080, height=1920" />
+    <title>DropAudio CCS · Escena precio</title>
+    <script src="vendor/gsap.min.js"></script>
+    <style>
+      @font-face { font-family: "Space Grotesk"; src: url("fonts/space-grotesk-latin-700-normal.woff2") format("woff2"); font-weight: 700; }
+      @font-face { font-family: "Plus Jakarta Sans"; src: url("fonts/plus-jakarta-sans-latin-600-normal.woff2") format("woff2"); font-weight: 600; }
+      @font-face { font-family: "Plus Jakarta Sans"; src: url("fonts/plus-jakarta-sans-latin-700-normal.woff2") format("woff2"); font-weight: 700; }
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body { width: 1080px; height: 1920px; overflow: hidden; background: #090807; }
+      #root { position: relative; width: 100%; height: 100%; overflow: hidden; background: #090807; color: #f0ede8; font-family: "Plus Jakarta Sans", sans-serif; }
+      .capa { position: absolute; inset: 0; }
+      /* Acabado (pseudo-elementos para no tapar el texto ante el auditor): viñeta y grano */
+      /* Fondo: degradado cálido, resplandor y polvo dorado */
+      #fondo { background: radial-gradient(120% 75% at 50% 42%, #1a150d 0%, #0c0b09 55%, #090807 100%); }
+      #resplandor { position: absolute; left: 90px; top: 380px; width: 900px; height: 900px; border-radius: 50%; background: #cda860; opacity: 0.16; filter: blur(190px); }
+      .polvo { position: absolute; border-radius: 50%; background: #e7c98a; }
+      #root::after { content: ""; position: absolute; inset: 0; z-index: 10; pointer-events: none; background: radial-gradient(95% 70% at 50% 48%, rgba(0,0,0,0) 52%, rgba(0,0,0,0.78) 100%); }
+      #root::before { content: ""; position: absolute; inset: -40px; z-index: 11; pointer-events: none; opacity: 0.07; mix-blend-mode: overlay;
+        background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='220' height='220'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>"); }
+      /* Logo */
+      #logo { position: absolute; top: 210px; left: 0; right: 0; display: flex; justify-content: center; align-items: center; gap: 14px; font-family: "Space Grotesk", sans-serif; font-weight: 700; font-size: 34px; letter-spacing: -0.02em; color: #f0ede8; }
+      #logo svg { width: 44px; height: 44px; display: block; }
+      #logo .p { color: #cda860; }
+      /* Escenario: columna centrada en la zona segura (300–1500 px) */
+      #escenario { position: absolute; left: 70px; right: 70px; top: 300px; bottom: 400px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
+      #kicker { font-family: "Space Grotesk", sans-serif; font-weight: 700; font-size: 32px; letter-spacing: 0.26em; color: #cda860; padding-left: 0.26em; }
+      #prod-caja { position: relative; width: 760px; height: 470px; margin: 26px 0 8px; perspective: 1400px; }
+      #halo { position: absolute; left: 50%; top: 50%; width: 640px; height: 640px; margin: -320px 0 0 -320px; border-radius: 50%; background: radial-gradient(circle, rgba(240,237,232,0.20), rgba(205,168,96,0.10) 45%, rgba(0,0,0,0) 70%); }
+      #prod-giro { position: absolute; inset: 0; transform-style: preserve-3d; }
+      #prod { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; filter: drop-shadow(0 46px 60px rgba(0,0,0,0.85)) drop-shadow(0 0 46px rgba(226,190,114,0.22)); }
+      #brillo-mask { position: absolute; inset: 0; overflow: hidden; -webkit-mask-size: contain; mask-size: contain; -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat; -webkit-mask-position: center; mask-position: center; }
+      #brillo { position: absolute; top: -20%; left: 0; width: 20%; height: 140%; mix-blend-mode: screen; background: linear-gradient(100deg, rgba(255,240,205,0) 0%, rgba(255,240,205,0.38) 50%, rgba(255,240,205,0) 100%); }
+      #nombre { font-family: "Space Grotesk", sans-serif; font-weight: 700; font-size: 92px; line-height: 1.0; letter-spacing: -0.04em; max-width: 920px; margin-top: 18px; }
+      #precio-fila { display: flex; align-items: flex-start; justify-content: center; margin-top: 18px; font-family: "Space Grotesk", sans-serif; font-weight: 700; color: #e2be72; letter-spacing: -0.05em; line-height: 1; }
+      #precio-fila .moneda { font-size: 0.5em; margin-top: 0.12em; margin-right: 0.04em; color: #cda860; }
+      .col { position: relative; height: 1em; clip-path: inset(0 -60% 0 -60%); }
+      .tira { display: block; text-align: center; }
+      .tira span { display: block; height: 1em; line-height: 1em; }
+      .fijo { display: block; height: 1em; line-height: 1em; }
+      #precio-rayita { width: 220px; height: 6px; border-radius: 3px; background: linear-gradient(90deg, rgba(205,168,96,0), #e2be72, rgba(205,168,96,0)); margin-top: 22px; }
+      #detalle { margin-top: 34px; max-width: 900px; font-size: 46px; line-height: 1.25; font-weight: 600; color: #e9e4db; padding: 22px 40px; border-radius: 999px; border: 3px solid rgba(205,168,96,0.55); background: rgba(205,168,96,0.08); }
+      /* Variante sin imagen: solo tipográfica, más grande */
+      #root.sin-imagen #prod-caja { display: none; }
+      #root.sin-imagen #kicker { font-size: 38px; }
+      #onda-fondo { position: absolute; left: 40px; right: 40px; top: 560px; height: 700px; display: none; opacity: 0.16; }
+      #onda-fondo svg { width: 100%; height: 100%; display: block; overflow: visible; }
+      #root.sin-imagen #onda-fondo { display: block; }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="6" data-width="1080" data-height="1920">
+      <div id="fondo" class="capa"><div id="resplandor"></div><div id="polvo" class="capa"></div></div>
+
+      <div id="onda-fondo" data-layout-ignore>
+        <svg viewBox="0 0 24 24" preserveAspectRatio="none" fill="none" stroke="#cda860" stroke-width="0.35" stroke-linecap="round" stroke-linejoin="round"><path id="onda-trazo" d="M2 12h3l2-6 4 14 4-18 3 10h4" /></svg>
+      </div>
+
+      <div id="logo">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#cda860" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12h3l2-6 4 14 4-18 3 10h4" /></svg>
+        <span>DropAudio<span class="p">·</span>CCS</span>
+      </div>
+
+      <div id="escenario">
+        <div id="kicker">LLÉVATELO POR</div>
+        <div id="prod-caja">
+          <div id="halo"></div>
+          <div id="prod-giro">
+            <img id="prod" data-var-src="imagen" src="productos/kz-castor-pro-harman.webp" alt="" />
+            <div id="brillo-mask"><div id="brillo" data-layout-allow-overflow></div></div>
+          </div>
+        </div>
+        <div id="nombre" data-var-text="producto">KZ Castor Pro (Harman)</div>
+        <div id="precio-fila" aria-label="precio"></div>
+        <div id="precio-rayita"></div>
+        <div id="detalle" data-var-text="detalle">Doble driver y 4 modos de sonido</div>
+      </div>
+
+    </div>
+
+    <script>
+      // La duración total sale del data-duration del root (Reel Studio lo reescribe antes de renderizar).
+      const root = document.getElementById("root");
+      const D = Math.max(3, parseFloat(root.dataset.duration) || 6);
+      const V = (window.__hyperframes && window.__hyperframes.getVariables) ? window.__hyperframes.getVariables() : {};
+      const producto = String(V.producto != null ? V.producto : "KZ Castor Pro (Harman)");
+      const detalle = String(V.detalle != null ? V.detalle : "");
+      const imagen = String(V.imagen != null ? V.imagen : "productos/kz-castor-pro-harman.webp").trim();
+      const precio = Number(V.precio != null ? V.precio : 28);
+
+      function prng(seed) { let s = seed >>> 0; return () => ((s = (s * 1664525 + 1013904223) >>> 0) / 4294967296); }
+
+      // Reduce el tamaño de letra hasta que el texto quepa en maxLineas (mide sin padding ni borde; solo al armar).
+      function ajustar(el, px, minPx, maxLineas, lh) {
+        const alto = () => {
+          const cs = getComputedStyle(el);
+          return el.getBoundingClientRect().height - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom) - parseFloat(cs.borderTopWidth) - parseFloat(cs.borderBottomWidth);
+        };
+        el.style.fontSize = px + "px";
+        while (px > minPx && alto() > px * lh * maxLineas + 2) { px -= 4; el.style.fontSize = px + "px"; }
+        return px;
+      }
+
+      function construir() {
+        const conImagen = imagen !== "";
+        if (!conImagen) root.classList.add("sin-imagen");
+        document.getElementById("nombre").textContent = producto;
+        const detEl = document.getElementById("detalle");
+        detEl.textContent = detalle;
+        if (!detalle.trim()) detEl.style.display = "none";
+        if (conImagen) {
+          document.getElementById("prod").setAttribute("src", imagen);
+          const m = document.getElementById("brillo-mask");
+          m.style.webkitMaskImage = m.style.maskImage = 'url("' + imagen + '")';
+        }
+        ajustar(document.getElementById("nombre"), conImagen ? 92 : 124, 60, 2, 1.0);
+        ajustar(detEl, conImagen ? 46 : 52, 34, 2, 1.25);
+
+        // Precio con tiras de dígitos (seek-safe: solo yPercent).
+        const fila = document.getElementById("precio-fila");
+        fila.style.fontSize = (conImagen ? 280 : 380) + "px";
+        const txt = Number.isInteger(precio) ? String(precio) : precio.toFixed(2);
+        fila.innerHTML = '<span class="fijo moneda">$</span>';
+        const tiras = [];
+        for (const ch of txt) {
+          const col = document.createElement("span");
+          col.className = "col";
+          if (/[0-9]/.test(ch)) {
+            const tira = document.createElement("span");
+            tira.className = "tira";
+            for (let k = 0; k < 20; k++) { const s = document.createElement("span"); s.textContent = String(k % 10); tira.appendChild(s); }
+            col.appendChild(tira);
+            tiras.push({ tira, objetivo: 10 + Number(ch), col, ch });
+          } else {
+            const f = document.createElement("span"); f.className = "fijo"; f.textContent = ch; col.appendChild(f);
+          }
+          fila.appendChild(col);
+        }
+        // Cada columna mide lo que mide su dígito final (el "1" no deja hueco).
+        tiras.forEach((o) => {
+          const m = document.createElement("span");
+          m.style.display = "inline-block"; m.textContent = o.ch;
+          fila.appendChild(m); o.col.style.width = (m.getBoundingClientRect().width + 6) + "px"; fila.removeChild(m);
+        });
+
+        // Polvo dorado determinista
+        const rnd = prng(7), polvo = [];
+        const campo = document.getElementById("polvo");
+        for (let i = 0; i < 34; i++) {
+          const d = document.createElement("div"); d.className = "polvo";
+          const sz = 2.5 + rnd() * 6; d.style.width = d.style.height = sz.toFixed(1) + "px";
+          d.style.left = (rnd() * 1080).toFixed(0) + "px"; d.style.top = (120 + rnd() * 1750).toFixed(0) + "px";
+          d.style.opacity = (0.12 + rnd() * 0.4).toFixed(2);
+          if (sz > 6.5) d.style.filter = "blur(2px)";
+          d.dataset.dy = (90 + rnd() * 260).toFixed(0); d.dataset.dx = ((rnd() - 0.5) * 90).toFixed(0);
+          campo.appendChild(d); polvo.push(d);
+        }
+
+        const tl = gsap.timeline({ paused: true });
+        const EX = "expo.out";
+        const SALIDA = 0.5;           // segundos de salida al final
+        const tSal = D - SALIDA;
+
+        // Ambiente durante toda la escena
+        polvo.forEach((d) => tl.fromTo(d, { x: 0, y: 0 }, { x: +d.dataset.dx, y: -d.dataset.dy, duration: D, ease: "none" }, 0));
+        tl.fromTo("#resplandor", { opacity: 0.08, scale: 0.9 }, { opacity: 0.18, scale: 1.05, duration: D, ease: "sine.inOut" }, 0);
+        tl.fromTo("#escenario", { scale: 1 }, { scale: 1.035, duration: D, ease: "none" }, 0);
+
+        // Entrada
+        tl.fromTo("#logo", { opacity: 0, y: -24 }, { opacity: 1, y: 0, duration: 0.6, ease: EX }, 0.05);
+        tl.fromTo("#kicker", { opacity: 0, y: 30 }, { opacity: 1, y: 0, duration: 0.8, ease: EX }, 0.1);
+        let t = 0.3;
+        if (!conImagen) {
+          const trazo = document.getElementById("onda-trazo");
+          const largo = trazo.getTotalLength();
+          trazo.style.strokeDasharray = largo;
+          tl.fromTo(trazo, { strokeDashoffset: largo }, { strokeDashoffset: 0, duration: 1.6, ease: "power2.inOut" }, 0.1);
+          tl.fromTo("#onda-fondo", { scale: 1 }, { scale: 1.08, duration: D, ease: "none" }, 0);
+        }
+        if (conImagen) {
+          tl.fromTo("#halo", { opacity: 0, scale: 0.5 }, { opacity: 1, scale: 1, duration: 1.0, ease: EX }, 0.2);
+          tl.fromTo("#prod-giro", { opacity: 0, y: 180, rotationY: 75, rotationX: 18, scale: 0.85 }, { opacity: 1, y: 0, rotationY: 0, rotationX: 0, scale: 1, duration: 1.2, ease: EX }, 0.25);
+          t = 0.75;
+        }
+        tl.fromTo("#nombre", { opacity: 0, y: 60, filter: "blur(12px)" }, { opacity: 1, y: 0, filter: "blur(0px)", duration: 0.8, ease: EX }, t);
+        const tPrecio = t + 0.4;
+        tl.fromTo("#precio-fila", { opacity: 0, scale: 1.25, filter: "blur(18px)" }, { opacity: 1, scale: 1, filter: "blur(0px)", duration: 0.7, ease: "power4.out" }, tPrecio);
+        tiras.forEach((o, i) => tl.fromTo(o.tira, { yPercent: 0 }, { yPercent: -o.objetivo * 5, duration: 1.2 + i * 0.2, ease: "expo.out" }, tPrecio));
+        tl.fromTo("#precio-rayita", { scaleX: 0, opacity: 0 }, { scaleX: 1, opacity: 1, duration: 0.8, ease: EX }, tPrecio + 0.6);
+        const tDet = tPrecio + 0.9;
+        tl.fromTo("#detalle", { opacity: 0, y: 40, scale: 0.92 }, { opacity: 1, y: 0, scale: 1, duration: 0.7, ease: "back.out(1.6)" }, tDet);
+        const tLeido = tDet + 0.7;   // todo visible desde aquí
+
+        // Sostenido: flotación suave y barrido de luz (se reparte en el tiempo disponible)
+        const sost = Math.max(0.5, tSal - tLeido);
+        if (conImagen) {
+          tl.to("#prod-giro", { y: -18, rotationY: 10, duration: sost + 0.4, ease: "sine.inOut" }, tLeido - 0.4);
+          tl.fromTo("#brillo", { xPercent: -120 }, { xPercent: 540, duration: Math.min(1.4, sost), ease: "power2.inOut" }, tLeido - 0.3);
+        }
+        tl.fromTo("#precio-fila", { textShadow: "0 0 0px rgba(226,190,114,0)" }, { textShadow: "0 0 40px rgba(226,190,114,0.45)", duration: Math.max(0.4, sost / 2), ease: "sine.inOut", yoyo: true, repeat: 1, immediateRender: false }, tLeido);
+
+        // Salida
+        tl.to(["#escenario", "#logo"], { opacity: 0, y: -50, filter: "blur(10px)", duration: SALIDA, ease: "power3.in" }, tSal);
+
+        window.__timelines["main"] = tl;
+      }
+
+      Promise.all([
+        document.fonts.load('700 100px "Space Grotesk"'),
+        document.fonts.load('600 40px "Plus Jakarta Sans"'),
+      ]).then(construir, construir);
+    </script>
+  </body>
+</html>

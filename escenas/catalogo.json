@@ -1,0 +1,212 @@
+{
+  "duracion": {
+    "mecanismo": "reescribir_data_duration_root",
+    "descripcion": "HyperFrames fija la duración del render leyendo el data-duration ESTÁTICO del root antes de ejecutar scripts; una variable (--variables) no puede cambiarla. Por eso, en la copia temporal de la plantilla, Reel Studio reemplaza el único data-duration del index.html (el del <div id=\"root\">) por la duración calculada. La plantilla lee root.dataset.duration al armar su timeline y reparte entrada, lectura, sostenido y salida en ese tiempo; el estado final legible se mantiene hasta la salida.",
+    "patron_regex": "(<div id=\"root\"[^>]*?data-duration=\")[0-9.]+(\")",
+    "reemplazo": "\\g<1>{segundos}\\g<2>",
+    "formato_segundos": "número con hasta 2 decimales, p. ej. 6.4",
+    "formula": "duracion = clamp(entrada + max(lectura, minimo_por_bloque * n_bloques_visibles) + pausa_final + salida, dur_min, dur_max); lectura = palabras de las variables de 'bloques' / palabras_por_segundo (el texto_fijo es kicker/CTA que ya se lee durante la entrada y no suma); cada tipo puede sobrescribir pausa_final",
+    "palabras_por_segundo": 2.5,
+    "minimo_por_bloque": 1.5,
+    "pausa_final": 1.0,
+    "nota": "Todas las claves de este archivo salvo 'duracion' son tipos de escena.",
+    "hyperframes": "0.8.77",
+    "formato": {
+      "ancho": 1080,
+      "alto": 1920,
+      "fps": 30,
+      "audio": false
+    },
+    "ensamblado": {
+      "descripcion": "Cada plantilla usa rutas relativas a su propia carpeta (HyperFrames rechaza '../'). Las fuentes, GSAP y las imágenes viven una sola vez en escenas/ y se copian a la carpeta temporal antes del render.",
+      "pasos": [
+        "copiar escenas/<tipo>/ (index.html, hyperframes.json, meta.json) a una carpeta temporal",
+        "copiar escenas/fonts/ a <temporal>/fonts/ y escenas/vendor/ a <temporal>/vendor/ (los .txt de licencia que van dentro pueden copiarse o no: el render no los usa)",
+        "si el producto tiene imagen en escenas/productos/mapa.json: copiar escenas/productos/<archivo> a <temporal>/productos/<archivo> y pasar imagen = \"productos/<archivo>\"; si no tiene, pasar imagen = \"\" (la escena queda solo tipográfica)",
+        "reescribir el data-duration del root con la duración calculada (ver 'duracion')",
+        "escribir vars.json con los valores y ejecutar en <temporal>: npx --yes hyperframes@0.8.77 render --variables-file vars.json --quality looks --output <salida>.mp4"
+      ]
+    }
+  },
+  "precio": {
+    "descripcion": "Producto con su precio en grande (conteo rodante) y un detalle corto. Con imagen el producto entra en 3D; sin imagen es tipográfica.",
+    "pasos": [
+      "5",
+      "cta"
+    ],
+    "dur_min": 5.0,
+    "dur_max": 9.0,
+    "entrada": 2.8,
+    "salida": 0.5,
+    "pausa_final": 0.5,
+    "bloques": [
+      "producto",
+      "detalle"
+    ],
+    "texto_fijo": "Llévatelo por",
+    "variables": {
+      "producto": {
+        "tipo": "string",
+        "max": 32
+      },
+      "precio": {
+        "tipo": "number",
+        "max": null
+      },
+      "detalle": {
+        "tipo": "string",
+        "max": 40
+      },
+      "imagen": {
+        "tipo": "string",
+        "max": null,
+        "opcional": true,
+        "origen": "productos/mapa.json (nunca del LLM)",
+        "nota": "Pasar SIEMPRE: \"productos/<archivo>\" si el producto está en mapa.json, o \"\" para la versión tipográfica (si se omite, se usa la imagen de ejemplo del default)."
+      }
+    }
+  },
+  "comparativa": {
+    "descripcion": "Dos opciones A vs B en tarjetas, cada una con precio y punto fuerte, y un veredicto final.",
+    "pasos": [
+      "3",
+      "4",
+      "5"
+    ],
+    "dur_min": 7.0,
+    "dur_max": 14.0,
+    "entrada": 1.0,
+    "salida": 0.5,
+    "bloques": [
+      "a_nombre",
+      "a_precio",
+      "a_punto",
+      "b_nombre",
+      "b_precio",
+      "b_punto",
+      "veredicto"
+    ],
+    "texto_fijo": "¿Cuál te conviene? VS",
+    "variables": {
+      "a_nombre": {
+        "tipo": "string",
+        "max": 32
+      },
+      "a_precio": {
+        "tipo": "number",
+        "max": null
+      },
+      "a_punto": {
+        "tipo": "string",
+        "max": 48
+      },
+      "b_nombre": {
+        "tipo": "string",
+        "max": 32
+      },
+      "b_precio": {
+        "tipo": "number",
+        "max": null
+      },
+      "b_punto": {
+        "tipo": "string",
+        "max": 48
+      },
+      "veredicto": {
+        "tipo": "string",
+        "max": 80
+      }
+    }
+  },
+  "tres_datos": {
+    "descripcion": "Un título y tres datos numerados que entran uno a uno, con tiempo de lectura para cada uno.",
+    "pasos": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "dur_min": 7.5,
+    "dur_max": 14.0,
+    "entrada": 1.0,
+    "salida": 0.5,
+    "bloques": [
+      "titulo",
+      "dato1",
+      "dato2",
+      "dato3"
+    ],
+    "texto_fijo": "",
+    "variables": {
+      "titulo": {
+        "tipo": "string",
+        "max": 40
+      },
+      "dato1": {
+        "tipo": "string",
+        "max": 50
+      },
+      "dato2": {
+        "tipo": "string",
+        "max": 50
+      },
+      "dato3": {
+        "tipo": "string",
+        "max": 50
+      }
+    }
+  },
+  "para_quien": {
+    "descripcion": "Para quién es el producto: imagen (opcional), nombre y una frase grande «¿Es para ti?».",
+    "pasos": [
+      "4",
+      "5"
+    ],
+    "dur_min": 4.5,
+    "dur_max": 10.0,
+    "entrada": 2.2,
+    "salida": 0.5,
+    "bloques": [
+      "producto",
+      "para"
+    ],
+    "texto_fijo": "¿Es para ti?",
+    "variables": {
+      "producto": {
+        "tipo": "string",
+        "max": 32
+      },
+      "para": {
+        "tipo": "string",
+        "max": 60
+      },
+      "imagen": {
+        "tipo": "string",
+        "max": null,
+        "opcional": true,
+        "origen": "productos/mapa.json (nunca del LLM)",
+        "nota": "Pasar SIEMPRE: \"productos/<archivo>\" si el producto está en mapa.json, o \"\" para la versión tipográfica (si se omite, se usa la imagen de ejemplo del default)."
+      }
+    }
+  },
+  "cta": {
+    "descripcion": "Cierre de marca: logo, una frase y el CTA fijo «Comenta ASESORÍA / o escríbenos al 0422-1609357».",
+    "pasos": [
+      "cta"
+    ],
+    "dur_min": 4.5,
+    "dur_max": 8.0,
+    "entrada": 2.3,
+    "salida": 0.45,
+    "bloques": [
+      "linea"
+    ],
+    "texto_fijo": "Comenta ASESORÍA o escríbenos al 0422-1609357",
+    "variables": {
+      "linea": {
+        "tipo": "string",
+        "max": 50
+      }
+    }
+  }
+}

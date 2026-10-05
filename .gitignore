@@ -33,3 +33,15 @@ readme-motion/renders/
 Thumbs.db
 .DS_Store
 desktop.ini
+
+# Escenas animadas (plantillas HyperFrames): no subir dependencias, renders ni capturas
+escenas/**/node_modules/
+escenas/**/renders/
+escenas/**/snapshots/
+escenas/**/.hyperframes/
+escenas/*/fonts/
+escenas/*/vendor/
+escenas/*/productos/
+
+# Caché de fuentes descargadas en tiempo de ejecución (solo la raíz)
+/fonts/
