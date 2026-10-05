@@ -33,21 +33,28 @@ textos; nunca escribe HTML ni animaciones.
 ## Componentes
 
 ### A. Plantillas — `escenas/<tipo>/` (proyectos HyperFrames)
-Cinco plantillas 1080×1920, 30 fps, **duración fija**, sin audio (la música/voz la pone el reel):
+Cinco plantillas 1080×1920, 30 fps, sin audio (la música/voz la pone el reel). **Duración no fija: prioridad calidad
+y legibilidad.** Cada escena dura lo necesario para que su texto se lea con calma y la animación respire (ver «Duración»).
 
-| tipo | dur | pasos donde encaja | variables (string salvo indicación) |
-|---|---|---|---|
-| `precio` | 4 s | "5", "cta" | `producto`, `precio` (number), `detalle` (≤ 40) , `imagen` (src opcional) |
-| `comparativa` | 6 s | "3", "4", "5" | `a_nombre`, `a_precio` (number), `a_punto`, `b_nombre`, `b_precio` (number), `b_punto`, `veredicto` |
-| `tres_datos` | 7 s | "1", "2", "3", "4" | `titulo` (≤ 40), `dato1`, `dato2`, `dato3` (≤ 50 c/u) |
-| `para_quien` | 4 s | "4", "5" | `producto`, `para` (≤ 60), `imagen` (src opcional) |
-| `cta` | 4 s | "cta" | `linea` (≤ 50, p. ej. «Lo pruebas antes de pagar») |
+| tipo | pasos donde encaja | variables (string salvo indicación) |
+|---|---|---|
+| `precio` | "5", "cta" | `producto`, `precio` (number), `detalle` (≤ 40) , `imagen` (src opcional) |
+| `comparativa` | "3", "4", "5" | `a_nombre`, `a_precio` (number), `a_punto`, `b_nombre`, `b_precio` (number), `b_punto`, `veredicto` |
+| `tres_datos` | "1", "2", "3", "4" | `titulo` (≤ 40), `dato1`, `dato2`, `dato3` (≤ 50 c/u) |
+| `para_quien` | "4", "5" | `producto`, `para` (≤ 60), `imagen` (src opcional) |
+| `cta` | "cta" | `linea` (≤ 50, p. ej. «Lo pruebas antes de pagar») |
 
 - Cada plantilla declara `data-composition-variables` con `default` útiles, usa `data-var-text`/`data-var-src`, y
   pasa `npx hyperframes lint` y `check`. Fuentes locales en `escenas/fonts/`. Imágenes de producto recortadas en
   `escenas/productos/<slug>.webp` (copiadas de `../DropAudio CCS landing/public/img/hero/*-t.webp`; si no hay imagen,
   la escena es solo tipográfica).
-- `escenas/catalogo.json`: por tipo → `{"dur", "pasos", "descripcion", "variables": {id: {"tipo", "max"}}}`. Es la
+- **Duración:** la decide la legibilidad, no un número fijo. `escenas.duracion(tipo, datos)` = entrada + tiempo de
+  lectura (≈ 2,5 palabras/s del texto visible, ≥ 1,5 s por bloque de texto) + pausa final legible + salida, acotada por
+  `dur_min`/`dur_max` que el diseñador de cada plantilla fija según lo que se ve bien. La duración calculada se pasa al
+  render y la plantilla reparte su animación en ese tiempo (el estado final legible se mantiene hasta el corte). Si
+  HyperFrames no permite variar la duración de la composición por variable, el implementador elige el mecanismo
+  equivalente (p. ej. componer la duración en el `index.html` generado antes del render) y lo documenta.
+- `escenas/catalogo.json`: por tipo → `{"dur_min", "dur_max", "pasos", "descripcion", "variables": {id: {"tipo", "max"}}}`. Es la
   única fuente para el prompt del LLM, la validación y el render.
 
 ### B. Motor — `escenas.py`
@@ -71,7 +78,7 @@ Cinco plantillas 1080×1920, 30 fps, **duración fija**, sin audio (la música/v
 - Prompt del escritor (solo si el plan tiene escenas): lista de plantillas desde `catalogo.json` (tipo, duración, pasos,
   variables), segundos de video real disponibles, objetivo, y reglas: escenas solo en sus pasos, video real primero,
   máximo 40 % del reel en escenas, precios solo del catálogo, el gancho siempre es video real.
-- `validar`: conserva las escenas válidas (`validar_escena`) con `segundos = dur` del catálogo y `paso` permitido;
+- `validar`: conserva las escenas válidas (`validar_escena`) con `segundos = escenas.duracion(tipo, datos)` y `paso` permitido;
   descarta las inválidas.
 - `chequeos`: la duración incluye escenas; nuevos problemas: video real < 20 s (grave 3), escenas > 40 % (grave 1),
   escena en paso no permitido (grave 1). `guion_en_texto` describe las escenas para el crítico.
@@ -90,7 +97,7 @@ Cinco plantillas 1080×1920, 30 fps, **duración fija**, sin audio (la música/v
   `disponible()` es falso, la casilla queda desactivada con el motivo («Instala Node 22+»…). `/api/estado` expone
   `escenas: {disponible, motivo}`.
 - Editor del guion: los clips de escena se muestran como tarjeta «ESCENA · <tipo>» con sus textos editables (inputs
-  por variable del catálogo), duración fija, y se pueden mover/quitar como los demás. En la línea de tiempo llevan un
+  por variable del catálogo), duración calculada (se actualiza al editar el texto), y se pueden mover/quitar como los demás. En la línea de tiempo llevan un
   color propio.
 
 ## Manejo de errores

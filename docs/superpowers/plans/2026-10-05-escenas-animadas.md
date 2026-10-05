@@ -13,7 +13,8 @@ Tests: `<python> -m pytest -q` desde el worktree (hoy 38 en verde; deben seguir 
   Plus Jakarta Sans; logo onda `M2 12h3l2-6 4 14 4-18 3 10h4` + "DropAudio·CCS"; ritmo de los reels v1; textos 1–2
   líneas ≥ 1,5 s en pantalla.
 - Precios en $, solo del catálogo de la app. CTA «Comenta ASESORÍA» / «o escríbenos al 0422-1609357».
-- Tipos y duraciones exactas: precio 4 s, comparativa 6 s, tres_datos 7 s, para_quien 4 s, cta 4 s; mínimo real con
+- Tipos: precio, comparativa, tres_datos, para_quien, cta. Duración NO fija: calidad y legibilidad primero, calculada
+  por `escenas.duracion(tipo, datos)` dentro de `dur_min`/`dur_max` de cada plantilla (spec A «Duración»). Mínimo real con
   escenas 20 s; escenas ≤ 40 % del reel; duracion_objetivo ∈ {35, 45, 60}.
 - Tests sin red ni Node (subprocess simulado). No git push, tags ni releases. Respetar finales de línea de cada archivo.
 
@@ -28,7 +29,9 @@ Spec: componente A.
   renombrados por slug del nombre del catálogo (`productos.json`), más un `escenas/productos/mapa.json`
   `{nombre_producto: archivo}` solo para los que tengan imagen.
 - Variables exactamente como la tabla del spec A (ids, tipos, máximos), con `default` útiles en español.
-- `escenas/catalogo.json` según spec A (`dur`, `pasos`, `descripcion`, `variables` {id: {"tipo", "max"}}), coherente
+- Diseña cada plantilla para que se entienda: jerarquía clara, texto grande, entrada/salida que respiren; fija
+  `dur_min`/`dur_max` por lo que se ve bien en los snapshots. Implementa el mecanismo de duración variable (spec A).
+- `escenas/catalogo.json` según spec A (`dur_min`, `dur_max`, `pasos`, `descripcion`, `variables` {id: {"tipo", "max"}}), coherente
   con cada `index.html`.
 - Verificación: en cada plantilla `npx --yes hyperframes@0.8.77 lint` y `check`, `snapshot` en 2–3 tiempos y un
   render de prueba `--quality draft` de `precio` y `cta` con `--variables` de ejemplo; reportar duración con `ffprobe`.
@@ -36,7 +39,8 @@ Spec: componente A.
 
 ### Task 2: Motor `escenas.py`
 Spec: componente B.
-- `disponible()`, `catalogo()`, `validar_escena(tipo, datos, catalogo_precios)`, `render(tipo, datos, cache_dir)`
+- `disponible()`, `catalogo()`, `duracion(tipo, datos)`, `validar_escena(tipo, datos, catalogo_precios)`,
+  `render(tipo, datos, cache_dir)` (renderiza con la duración calculada)
   exactamente como el spec B. `imagen` se resuelve con `escenas/productos/mapa.json` a partir de `producto` /
   `a_nombre`; nunca se acepta del LLM.
 - Tests `tests/test_escenas.py` (ver spec «Pruebas»).
