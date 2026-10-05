@@ -10,15 +10,21 @@ from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs
 
 import reel_studio as core
+import actualizador
+import rutas
+import ollama_catalogo
+import version
 
 PUERTO = 8765
-# BASE: donde viven tus datos (config, carpeta de videos). RES: archivos de la app (html). Iguales salvo en el .exe.
-BASE = os.path.dirname(sys.executable) if getattr(sys, "frozen", False) else os.path.dirname(os.path.abspath(__file__))
-RES = getattr(sys, "_MEIPASS", BASE)
+# BASE: donde viven tus datos (config, log, fuentes). RES: archivos de la app (html). En el .exe BASE (%APPDATA%\ReelStudio) y
+# RES (el paquete) son carpetas distintas; en desarrollo son la misma carpeta del script.
+BASE = rutas.datos()
+RES = getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__)))
 AQUI = BASE
+rutas.migrar_datos()
 CFG_FILE = os.path.join(BASE, "studio_config.json")
 
-CFG = {"carpeta": os.path.join(AQUI, "Videos Dropaudioccs"), "vision": "gemma3:4b", "jev": "nimble:latest",
+CFG = {"carpeta": rutas.videos_defecto(), "vision": "gemma3:4b", "jev": "nimble:latest",
        "escritor": "glm-5.3:cloud", "whisper": "small", "paso": 3.0, "minimo": 0.5, "drafts": core.CAPCUT_DRAFTS,
        "vol_clips": 1.0, "vol_musica": 0.25, "musica": True, "nombre": "reel_auto_01", "rehacer": False,
        "simultaneos": 6, "saltar_repetidos": True, "formatos": list(core.ORDEN_FORMATOS), "max_por_formato": 2, "catalogo": [],
@@ -54,7 +60,7 @@ if importar_productos()[0]:  # la primera vez (o si la tienda tiene modelos nuev
 
 LOCK = threading.Lock()
 JOB = {"tarea": None, "corriendo": False, "hecho": 0, "total": 0, "mensaje": "", "ok": None, "inicio": 0, "fin": 0}
-LOG, ESTADO = [], {"analisis_v": 0, "guion_v": 0, "etiq_v": 0, "modelos": [], "borrador": None}
+LOG, ESTADO = [], {"analisis_v": 0, "guion_v": 0, "etiq_v": 0, "modelos": [], "borrador": None, "update": None}
 
 
 def guardar_cfg():
@@ -152,6 +158,33 @@ def lanzar(tarea, fn):
 def t_modelos():
     ESTADO["modelos"] = core.modelos()
     return f"{len(ESTADO['modelos'])} modelos de Ollama disponibles"
+
+
+def t_actualizar():
+    def prog(p):
+        with LOCK:
+            JOB["hecho"], JOB["total"] = p, 100
+            JOB["mensaje"] = f"Descargando actualización… {p}%"
+    return actualizador.aplicar(prog)
+
+
+def t_descargar_modelo(modelo):
+    def prog(hecho, total, estado):
+        with LOCK:
+            JOB["hecho"], JOB["total"] = hecho, total
+            JOB["mensaje"] = f"{modelo}: {estado}" + (f" ({hecho * 100 // total}%)" if total else "")
+    msg = ollama_catalogo.descargar(modelo, prog)
+    try:
+        ESTADO["modelos"] = core.modelos()
+    except Exception:
+        pass  # la descarga ya terminó bien; la lista se refrescará en la próxima consulta
+    return msg
+
+
+def chequear_update():
+    """Una sola consulta de versión nueva, 5 s después de arrancar (nunca rompe la app)."""
+    time.sleep(5)
+    ESTADO["update"] = actualizador.buscar()
 
 
 def t_analizar():
@@ -282,13 +315,15 @@ class H(BaseHTTPRequestHandler):
             b = open(os.path.join(RES, "studio.html"), "rb").read()
             self.send_response(200); self.send_header("Content-Type", "text/html; charset=utf-8")
             self.send_header("Cache-Control", "no-store"); self.end_headers(); self.wfile.write(b)
+        elif u.path == "/api/ollama/buscar":  # ?q=&c= -> {"fuente": "web"|"lista", "modelos": [...]}
+            self._json(ollama_catalogo.buscar(q.get("q", [""])[0], q.get("c", [""])[0]))
         elif u.path == "/api/estado":
             v = int(q.get("av", ["-1"])[0]); gv = int(q.get("gv", ["-1"])[0]); ev = int(q.get("ev", ["-1"])[0])
             with LOCK:
                 job = dict(JOB); log = LOG[-120:]
-            out = {"cfg": CFG, "archivos": archivos(), "modelos": ESTADO["modelos"], "job": job, "log": log,
+            out = {"version": version.__version__, "cfg": CFG, "archivos": archivos(), "modelos": ESTADO["modelos"], "job": job, "log": log,
                    "borrador": ESTADO["borrador"], "analisis_v": ESTADO["analisis_v"], "guion_v": ESTADO["guion_v"],
-                   "etiq_v": ESTADO["etiq_v"],
+                   "etiq_v": ESTADO["etiq_v"], "update": ESTADO["update"],
                    "ahora": time.time()}
             if v != ESTADO["analisis_v"]:
                 a = leer("analisis.json")
@@ -342,7 +377,18 @@ class H(BaseHTTPRequestHandler):
         else:
             self.send_response(404); self.end_headers()
 
+    def _origen_valido(self):
+        """Anti-CSRF: una página web externa no puede disparar acciones POST contra el servidor local."""
+        o = self.headers.get("Origin")
+        if o is None:
+            return True
+        puerto = self.server.server_address[1]
+        return o in (f"http://127.0.0.1:{puerto}", f"http://localhost:{puerto}")
+
     def do_POST(self):
+        if not self._origen_valido():
+            self._json({"ok": False, "error": "Origen no permitido"}, 403)
+            return
         u = urlparse(self.path)
         try:
             if u.path == "/api/cfg":
@@ -364,6 +410,17 @@ class H(BaseHTTPRequestHandler):
                     CFG["carpeta"] = c; guardar_cfg()
                     ESTADO["analisis_v"] += 1; ESTADO["guion_v"] += 1; ESTADO["etiq_v"] += 1; ESTADO["borrador"] = None
                 self._json({"carpeta": CFG["carpeta"]})
+            elif u.path == "/api/actualizar":
+                u_ = ESTADO["update"]
+                ok = bool(u_ and u_.get("nueva")) and lanzar("actualizar", t_actualizar)
+                self._json({"ok": ok}, 200 if ok else 409)
+            elif u.path == "/api/ollama/descargar":  # {"modelo": "gemma3:4b"}
+                modelo = str(self._body().get("modelo", "")).strip()
+                if not ollama_catalogo.nombre_valido(modelo):
+                    self._json({"ok": False, "error": "Nombre de modelo no válido"}, 400)
+                else:
+                    ok = lanzar("descargar_modelo", lambda: t_descargar_modelo(modelo))
+                    self._json({"ok": ok}, 200 if ok else 409)
             elif u.path.startswith("/api/tarea/"):
                 nombre = u.path.rsplit("/", 1)[1]
                 ok = nombre in TAREAS and lanzar(nombre, TAREAS[nombre])
@@ -437,6 +494,7 @@ def iniciar_servidor(puerto=PUERTO):
     srv = ThreadingHTTPServer(("127.0.0.1", puerto), H)
     threading.Thread(target=srv.serve_forever, daemon=True).start()
     lanzar("modelos", t_modelos)
+    threading.Thread(target=chequear_update, daemon=True).start()
     return srv, f"http://127.0.0.1:{srv.server_address[1]}/"
 
 
@@ -445,6 +503,7 @@ def main():
     url = f"http://127.0.0.1:{PUERTO}/"
     print(f"Reel Studio abierto en {url}  (cierra esta ventana para apagarlo)")
     lanzar("modelos", t_modelos)
+    threading.Thread(target=chequear_update, daemon=True).start()
     if "--no-browser" not in sys.argv:
         threading.Timer(0.8, lambda: webbrowser.open(url)).start()
     srv.serve_forever()

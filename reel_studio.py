@@ -13,9 +13,11 @@ Instalar (una vez):  pip install faster-whisper pillow pillow-heif numpy
                      pip install -e C:\\Users\\DAN_PC\\Documents\\GitHub\\pyCapCut
 Ejecutar:            python reel_studio.py
 """
+import rutas
 import json, os, sys, queue, re, subprocess, threading, time, urllib.request, urllib.error, base64, tempfile
 
 OLLAMA = os.environ.get("OLLAMA_HOST", "http://localhost:11434")
+# AQUI: carpeta de la app (junto al .exe, que Velopack reemplaza en cada update). Los datos del usuario van en rutas.datos().
 AQUI = os.path.dirname(sys.executable) if getattr(sys, "frozen", False) else os.path.dirname(os.path.abspath(__file__))
 VIDEO_EXT = (".mp4", ".mov", ".m4v", ".mkv", ".avi")
 FOTO_EXT = (".jpg", ".jpeg", ".png", ".heic", ".webp")
@@ -930,7 +932,7 @@ FUENTES = {"SG.ttf": "https://github.com/google/fonts/raw/main/ofl/spacegrotesk/
 
 def fuente(nombre, size, peso):
     from PIL import ImageFont
-    path = os.path.join(AQUI, "fonts", nombre)
+    path = os.path.join(rutas.datos(), "fonts", nombre)  # caché: sobrevive a las actualizaciones
     if not os.path.exists(path):
         os.makedirs(os.path.dirname(path), exist_ok=True)
         urllib.request.urlretrieve(FUENTES[nombre], path)
@@ -1146,7 +1148,7 @@ def interfaz():
 
     cola = queue.Queue()
     v = {k: tk.StringVar(value=x) for k, x in {
-        "carpeta": os.path.join(AQUI, "Videos Dropaudioccs"), "vision": "gemma3:4b", "jev": "nimble:latest",
+        "carpeta": os.path.join(rutas.datos(), "Videos Dropaudioccs"), "vision": "gemma3:4b", "jev": "nimble:latest",
         "escritor": "glm-5.3:cloud", "whisper": "small", "nombre": "reel_auto_01", "drafts": CAPCUT_DRAFTS,
         "estado": "Elige una carpeta y pulsa Analizar."}.items()}
     paso, minimo = tk.DoubleVar(value=3.0), tk.DoubleVar(value=0.5)

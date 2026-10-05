@@ -184,6 +184,21 @@ summary::after{content:"＋";color:var(--gold)}details[open] summary::after{cont
 .toma.sel{border-color:var(--gold);box-shadow:0 0 0 1px var(--gold)}
 dialog#visor{width:min(1180px,96vw);max-height:94vh;padding:0;border:1px solid var(--line2);border-radius:18px;background:var(--panel);color:var(--bone)}
 dialog#visor::backdrop{background:rgba(0,0,0,.72)}
+dialog#ollamaBuscar{width:min(760px,96vw);max-height:90vh;padding:0;border:1px solid var(--line2);border-radius:18px;background:var(--panel);color:var(--bone)}
+dialog#ollamaBuscar::backdrop{background:rgba(0,0,0,.72)}
+#ollamaBuscar .obody{display:grid;gap:12px;padding:16px;max-height:calc(90vh - 60px);overflow:auto}
+#ollamaBuscar input[type=search]{width:100%}
+.ofilt{display:flex;flex-wrap:wrap;gap:6px}
+.ores{display:grid;gap:10px}
+.ocard{border:1px solid var(--line2);border-radius:12px;padding:12px;display:grid;gap:8px}
+.ocard h4{margin:0;font:700 14px/1.2 var(--f-title);display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.ocard p{margin:0;font-size:13px;color:var(--muted)}
+.ocard .meta{display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:12px;color:var(--muted)}
+.ocard .acc{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.ocard .chip{min-height:30px;padding:4px 11px;font-size:12px}
+.otag{border:1px solid var(--line2);border-radius:99px;padding:1px 8px;font-size:11px}
+.oinst{color:var(--ok);font-weight:700;font-size:12px}
+.onota{font-size:12.5px;color:var(--muted);border:1px dashed var(--line2);border-radius:10px;padding:8px 10px}
 .vhead{display:flex;align-items:center;gap:10px;padding:12px 16px;border-bottom:1px solid var(--line)}
 .vhead h3{margin:0;flex:1;font:700 15px/1.2 var(--f-title);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .vbody{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(300px,1fr);gap:16px;padding:16px;max-height:calc(94vh - 60px);overflow:auto}
@@ -202,6 +217,12 @@ dialog#visor::backdrop{background:rgba(0,0,0,.72)}
 .critica{border:1px solid var(--line2);border-radius:var(--r);background:var(--card);padding:14px;margin-bottom:14px;display:grid;gap:8px}
 .critica .top3{display:flex;align-items:center;gap:10px;flex-wrap:wrap}.critica h4{margin:0;font:700 15px/1.2 var(--f-title);flex:1}
 .critica ul{margin:0;padding-left:18px;color:var(--muted);font-size:13px;display:grid;gap:3px}
+.upd{display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px;background:var(--panel);border:1px solid var(--gold);border-radius:var(--r2);padding:10px 14px;margin-bottom:16px}
+.upd[hidden]{display:none}
+.upd b{color:var(--gold)}
+.upd .acc{display:flex;gap:8px;margin-left:auto;flex-wrap:wrap}
+.upd details{flex-basis:100%}
+.upd pre{white-space:pre-wrap;font-size:12px;line-height:1.5;font-family:inherit;color:var(--muted);max-height:180px;overflow:auto;margin:6px 0 0}
 </style>
 </head>
 <body>
@@ -219,6 +240,7 @@ dialog#visor::backdrop{background:rgba(0,0,0,.72)}
   <symbol id="i-down" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></symbol>
   <symbol id="i-trash" viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></symbol>
   <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><path d="M11 4a7 7 0 1 0 0 14 7 7 0 0 0 0-14zM21 21l-5-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
   <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
 </svg>
 
@@ -226,7 +248,7 @@ dialog#visor::backdrop{background:rgba(0,0,0,.72)}
 <aside aria-label="Proyecto y modelos">
   <div class="brand">
     <svg width="38" height="38" viewBox="0 0 24 24" style="color:var(--gold)"><use href="#i-wave"/></svg>
-    <div><b>Reel Studio</b><small>DropAudio CCS · CapCut + Ollama</small></div>
+    <div><b>Reel Studio</b><small id="verApp">DropAudio CCS · CapCut + Ollama</small></div>
   </div>
 
   <section>
@@ -251,6 +273,7 @@ dialog#visor::backdrop{background:rgba(0,0,0,.72)}
       <select id="sWh" data-k="whisper"><option>(ninguno)</option><option>tiny</option><option>base</option><option>small</option><option>medium</option></select>
       <div class="help">Para no cortar lo que dices. «small» = buen equilibrio</div></div>
     <button class="btn ghost sm" id="bModels"><svg width="15" height="15"><use href="#i-refresh"/></svg>Actualizar lista</button>
+    <button class="btn ghost sm" id="bOllama" style="margin-top:6px"><svg width="15" height="15"><use href="#i-search"/></svg>Buscar en ollama.com</button>
   </section>
 
   <details>
@@ -274,6 +297,14 @@ dialog#visor::backdrop{background:rgba(0,0,0,.72)}
 </aside>
 
 <main id="main">
+  <div class="upd" id="upd" hidden role="status">
+    <span>Hay una versión nueva: <b id="updV"></b></span>
+    <div class="acc">
+      <button class="btn gold sm" id="updGo">Actualizar y reiniciar</button>
+      <button class="btn ghost sm" id="updLater">Más tarde</button>
+    </div>
+    <details id="updNotas"><summary>Ver notas</summary><pre id="updTxt"></pre></details>
+  </div>
   <div class="top">
     <div>
       <h1>De tu carpeta a <em>CapCut</em>,<br>en tres pasos.</h1>
@@ -325,6 +356,28 @@ dialog#visor::backdrop{background:rgba(0,0,0,.72)}
   <section role="tabpanel" id="pan-l" aria-labelledby="tab-l" hidden><div class="log" id="log"></div></section>
 </main>
 </div>
+
+<dialog id="ollamaBuscar" aria-labelledby="oTit">
+  <div class="vhead">
+    <h3 id="oTit">Buscar modelos en ollama.com</h3>
+    <button class="iconbtn" id="oCerrar" aria-label="Cerrar"><svg width="16" height="16"><use href="#i-x"/></svg></button>
+  </div>
+  <div class="obody">
+    <div class="field"><label for="oQ">Buscar modelo</label>
+      <input type="search" id="oQ" placeholder="Ej.: gemma, llava, qwen" autocomplete="off"></div>
+    <div class="ofilt" role="group" aria-label="Filtrar por tipo">
+      <button class="chip" data-c="" aria-pressed="true">Todos</button>
+      <button class="chip" data-c="vision" aria-pressed="false">Visión</button>
+      <button class="chip" data-c="cloud" aria-pressed="false">Cloud</button>
+      <button class="chip" data-c="tools" aria-pressed="false">Tools</button>
+      <button class="chip" data-c="embedding" aria-pressed="false">Embedding</button>
+    </div>
+    <div id="oNota" class="onota" hidden></div>
+    <div id="oMsg" class="onota" role="alert" hidden></div>
+    <div id="oJob" class="help" role="status" aria-live="polite" hidden></div>
+    <div id="oRes" class="ores" aria-live="polite"></div>
+  </div>
+</dialog>
 
 <dialog id="visor" aria-labelledby="vTit">
   <div class="vhead">
@@ -887,13 +940,100 @@ function ding(ok){
   }catch(_){}
 }
 
+/* ---------- actualizaciones ---------- */
+let updOculto = false;
+function renderUpdate(d){
+  const u = d.update, ver = !!(u && u.nueva) && !updOculto;
+  $("#upd").hidden = !ver;
+  if (!ver) return;
+  $("#updV").textContent = "v" + u.nueva;
+  $("#updTxt").textContent = u.notas || "Sin notas.";
+  $("#updGo").disabled = !!d.job.corriendo;
+}
+$("#updLater").onclick = () => { updOculto = true; $("#upd").hidden = true; };
+$("#updGo").onclick = async () => {
+  const r = await api("/api/actualizar", {});
+  if (!r.ok) toast("No se pudo iniciar la actualización.", true);
+  poll();
+};
+
+/* ---------- buscador de modelos (ollama.com) ---------- */
+const O = {c:"", seq:0, t:null, lista:[], sel:{}};
+const oInstalado = (n, tag) => {
+  const nom = new Set(((S.modelos || [])).map(m => m[0]));
+  return tag ? nom.has(`${n}:${tag}`) : (nom.has(n) || nom.has(n + ":latest"));
+};
+const oSoloCloud = m => !!m.cloud && !(m.tamanos || []).length;  // solo estos modelos llevan chip "cloud" (nombre:cloud)
+const oSel = m => O.sel[m.nombre] ?? (oSoloCloud(m) ? "cloud" : "");
+const oNombre = m => { const t = oSel(m); return t ? `${m.nombre}:${t}` : m.nombre; };
+const oMsg = (txt, err=true) => { const e = $("#oMsg"); e.textContent = txt || ""; e.hidden = !txt; e.style.color = err ? "var(--bad, #e5484d)" : ""; };
+function oRender(){
+  const r = $("#oRes");
+  if (!O.lista.length){ r.innerHTML = '<div class="help">Sin resultados.</div>'; return; }
+  r.innerHTML = O.lista.map((m, i) => {
+    const t = oSel(m), inst = oInstalado(m.nombre, t);
+    const chips = (oSoloCloud(m) ? ["cloud"] : (m.tamanos || [])).map(x =>
+      `<button class="chip sm" data-i="${i}" data-t="${esc(x)}" aria-pressed="${t === x}">${esc(x)}</button>`).join("");
+    const caps = (m.capacidades || []).map(c => `<span class="otag">${esc(c)}</span>`).join("");
+    return `<div class="ocard"><h4>${esc(m.nombre)}${inst ? '<span class="oinst">Instalado</span>' : ""}</h4>
+      <p>${esc(m.descripcion)}</p>
+      <div class="meta">${caps}${m.pulls ? `<span>${esc(m.pulls)} descargas</span>` : ""}</div>
+      <div class="acc">${chips ? `<span class="help" id="ot${i}">Tamaño:</span>${chips}` : ""}
+        <button class="btn sm" data-dl="${i}"${inst || S.job?.corriendo ? " disabled" : ""}>${t === "cloud" ? "Agregar" : "Descargar"}</button></div></div>`;
+  }).join("");
+}
+async function oBuscar(){
+  const q = $("#oQ").value.trim(), n = ++O.seq;
+  try{
+    const d = await api(`/api/ollama/buscar?q=${encodeURIComponent(q)}&c=${encodeURIComponent(O.c)}`);
+    if (n !== O.seq) return;
+    O.lista = d.modelos || []; O.sel = {};
+    const nota = $("#oNota"); nota.hidden = d.fuente !== "lista";
+    nota.textContent = "Sin conexión con ollama.com: mostrando lista sugerida";
+    oRender();
+  }catch(e){ if (n === O.seq) $("#oRes").innerHTML = '<div class="help">No se pudo buscar. Intenta de nuevo.</div>'; }
+}
+$("#bOllama").onclick = () => { $("#ollamaBuscar").showModal(); $("#oQ").focus(); oBuscar(); };
+$("#oCerrar").onclick = () => $("#ollamaBuscar").close();
+$("#oQ").oninput = () => { clearTimeout(O.t); O.t = setTimeout(oBuscar, 400); };
+document.querySelector(".ofilt").onclick = e => {
+  const b = e.target.closest("[data-c]"); if (!b) return;
+  O.c = b.dataset.c;
+  document.querySelectorAll(".ofilt .chip").forEach(x => x.setAttribute("aria-pressed", x === b));
+  clearTimeout(O.t); oBuscar();
+};
+$("#oRes").onclick = async e => {
+  const c = e.target.closest("[data-t]");
+  if (c){ const m = O.lista[+c.dataset.i]; if (oSoloCloud(m)) return; O.sel[m.nombre] = oSel(m) === c.dataset.t ? "" : c.dataset.t; oRender(); return; }
+  const b = e.target.closest("[data-dl]"); if (!b) return;
+  const m = O.lista[+b.dataset.dl];
+  try{
+    const r = await fetch("/api/ollama/descargar", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({modelo:oNombre(m)})});
+    const d = await r.json();
+    if (r.status === 409) oMsg("Ya hay una tarea en curso. Espera a que termine.");
+    else if (!d.ok) oMsg(d.error || "No se pudo descargar el modelo.");
+    else oMsg("Descargando " + oNombre(m) + "…", false);
+  }catch(err){ oMsg("No se pudo descargar el modelo."); }
+  poll();
+};
+let oWas = false, oBusy = false;
+function renderOllama(d){
+  const j = d.job, run = j.corriendo && j.tarea === "descargar_modelo", el = $("#oJob");
+  el.hidden = !run; if (run) el.textContent = (j.mensaje || "Descargando…") + (j.total ? ` (${j.hecho}/${j.total})` : "");
+  if (oWas && !run) delete $("#sVision").dataset.loaded;
+  const busy = !!j.corriendo;
+  if ((oWas && !run) || busy !== oBusy){ if (run || busy) oMsg(""); if ($("#ollamaBuscar").open) oRender(); }
+  oWas = run; oBusy = busy;
+}
+
 /* ---------- polling ---------- */
 let pollT;
 async function poll(){
   clearTimeout(pollT);
   try{
     const d = await api(`/api/estado?av=${S.av}&gv=${S.gv}&ev=${S.ev}${S.fmts ? "" : "&fmt=1"}`);
-    S.cfg = d.cfg; S.job = d.job;
+    S.cfg = d.cfg; S.job = d.job; S.modelos = d.modelos;
+    if (d.version) $("#verApp").textContent = "DropAudio CCS · v" + d.version;
     if (S.catPend) S.cfg.catalogo = S.catLocal;
     let tomasCambio = false;
     if ("analisis" in d){ S.analisis = d.analisis; S.av = d.analisis_v; tomasCambio = true; }
@@ -902,7 +1042,7 @@ async function poll(){
       const nombres = new Set(S.lista.map(f => f.archivo)); [...S.sel].forEach(a => nombres.has(a) || S.sel.delete(a));
       if (!$("#pan-e").contains(document.activeElement)) renderEtiq(); }
     if ("guion" in d){ S.guion = d.guion; S.gv = d.guion_v; cargarReel(S.vi); if (!$("#pan-g").contains(document.activeElement)) renderGuion(); }
-    renderSide(d); renderFmts(); renderSteps(d); renderLog(d.log);
+    renderUpdate(d); renderSide(d); renderOllama(d); renderFmts(); renderSteps(d); renderLog(d.log);
     if (tomasCambio) renderTomas();
     pollT = setTimeout(poll, d.job.corriendo ? 900 : 3000);
   }catch(e){

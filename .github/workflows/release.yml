@@ -1,0 +1,95 @@
+name: Publicar versión
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - name: Código de Reel Studio
+        uses: actions/checkout@v4
+        with:
+          path: reel-capcut
+          fetch-depth: 0
+
+      - name: Código de pyCapCut (commit fijado)
+        uses: actions/checkout@v4
+        with:
+          repository: GuanYixuan/pyCapCut
+          ref: 27480a1e954740af50363076e6fea94f2893ae93
+          path: pyCapCut
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+          cache: pip
+          cache-dependency-path: reel-capcut/requirements.txt
+
+      - name: Instalar dependencias
+        working-directory: reel-capcut
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt pyinstaller
+
+      - name: Verificar que el tag coincide con la versión
+        id: version
+        working-directory: reel-capcut
+        shell: pwsh
+        run: |
+          $ver = python -c "from version import __version__; print(__version__)"
+          if ("v$ver" -ne "${{ github.ref_name }}") {
+            Write-Error "El tag ${{ github.ref_name }} no coincide con version.py (v$ver)"
+            exit 1
+          }
+          "ver=$ver" >> $env:GITHUB_OUTPUT
+
+      - name: Compilar con PyInstaller
+        working-directory: reel-capcut
+        run: pyinstaller --noconfirm ReelStudio.spec
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Instalar vpk (misma versión que el paquete pip velopack)
+        shell: pwsh
+        run: |
+          $v = (Select-String -Path reel-capcut/requirements.txt -Pattern '^velopack==(.+)$').Matches[0].Groups[1].Value.Trim()
+          dotnet tool install -g vpk --version $v
+          "$env:USERPROFILE\.dotnet\tools" | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
+
+      - name: Descargar releases previos (para deltas)
+        working-directory: reel-capcut
+        continue-on-error: true
+        run: vpk download github --repoUrl https://github.com/Dan178A/dropaudio-reel-studio --token ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Notas de la versión (git log desde el tag anterior)
+        working-directory: reel-capcut
+        shell: pwsh
+        run: |
+          $previo = git describe --tags --abbrev=0 "${{ github.ref_name }}^" 2>$null
+          if ($LASTEXITCODE -eq 0 -and $previo) { $rango = "$previo..${{ github.ref_name }}" } else { $rango = "${{ github.ref_name }}" }
+          [Console]::OutputEncoding = [Text.Encoding]::UTF8
+          $lineas = git log $rango --pretty=format:"- %s"
+          if (-not $lineas) { $lineas = "- Mejoras internas" }
+          $lineas | Set-Content -Encoding utf8 notas.md
+
+      - name: Empaquetar con Velopack
+        working-directory: reel-capcut
+        run: >
+          vpk pack --packId ReelStudio --packVersion ${{ steps.version.outputs.ver }}
+          --packDir dist/ReelStudio --mainExe ReelStudio.exe --packTitle "Reel Studio"
+          --icon icon.ico --releaseNotes notas.md
+
+      - name: Publicar en GitHub Releases
+        working-directory: reel-capcut
+        run: >
+          vpk upload github --repoUrl https://github.com/Dan178A/dropaudio-reel-studio
+          --publish --tag v${{ steps.version.outputs.ver }}
+          --releaseName "Reel Studio v${{ steps.version.outputs.ver }}"
+          --token ${{ secrets.GITHUB_TOKEN }}
