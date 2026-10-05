@@ -202,6 +202,12 @@ dialog#visor::backdrop{background:rgba(0,0,0,.72)}
 .critica{border:1px solid var(--line2);border-radius:var(--r);background:var(--card);padding:14px;margin-bottom:14px;display:grid;gap:8px}
 .critica .top3{display:flex;align-items:center;gap:10px;flex-wrap:wrap}.critica h4{margin:0;font:700 15px/1.2 var(--f-title);flex:1}
 .critica ul{margin:0;padding-left:18px;color:var(--muted);font-size:13px;display:grid;gap:3px}
+.upd{display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px;background:var(--panel);border:1px solid var(--gold);border-radius:var(--r2);padding:10px 14px;margin-bottom:16px}
+.upd[hidden]{display:none}
+.upd b{color:var(--gold)}
+.upd .acc{display:flex;gap:8px;margin-left:auto;flex-wrap:wrap}
+.upd details{flex-basis:100%}
+.upd pre{white-space:pre-wrap;font-size:12px;line-height:1.5;font-family:inherit;color:var(--muted);max-height:180px;overflow:auto;margin:6px 0 0}
 </style>
 </head>
 <body>
@@ -274,6 +280,14 @@ dialog#visor::backdrop{background:rgba(0,0,0,.72)}
 </aside>
 
 <main id="main">
+  <div class="upd" id="upd" hidden role="status">
+    <span>Hay una versión nueva: <b id="updV"></b></span>
+    <div class="acc">
+      <button class="btn gold sm" id="updGo">Actualizar y reiniciar</button>
+      <button class="btn ghost sm" id="updLater">Más tarde</button>
+    </div>
+    <details id="updNotas"><summary>Ver notas</summary><pre id="updTxt"></pre></details>
+  </div>
   <div class="top">
     <div>
       <h1>De tu carpeta a <em>CapCut</em>,<br>en tres pasos.</h1>
@@ -887,6 +901,23 @@ function ding(ok){
   }catch(_){}
 }
 
+/* ---------- actualizaciones ---------- */
+let updOculto = false;
+function renderUpdate(d){
+  const u = d.update, ver = !!(u && u.nueva) && !updOculto;
+  $("#upd").hidden = !ver;
+  if (!ver) return;
+  $("#updV").textContent = "v" + u.nueva;
+  $("#updTxt").textContent = u.notas || "Sin notas.";
+  $("#updGo").disabled = !!d.job.corriendo;
+}
+$("#updLater").onclick = () => { updOculto = true; $("#upd").hidden = true; };
+$("#updGo").onclick = async () => {
+  const r = await api("/api/actualizar", {});
+  if (!r.ok) toast("No se pudo iniciar la actualización.", true);
+  poll();
+};
+
 /* ---------- polling ---------- */
 let pollT;
 async function poll(){
@@ -903,7 +934,7 @@ async function poll(){
       const nombres = new Set(S.lista.map(f => f.archivo)); [...S.sel].forEach(a => nombres.has(a) || S.sel.delete(a));
       if (!$("#pan-e").contains(document.activeElement)) renderEtiq(); }
     if ("guion" in d){ S.guion = d.guion; S.gv = d.guion_v; cargarReel(S.vi); if (!$("#pan-g").contains(document.activeElement)) renderGuion(); }
-    renderSide(d); renderFmts(); renderSteps(d); renderLog(d.log);
+    renderUpdate(d); renderSide(d); renderFmts(); renderSteps(d); renderLog(d.log);
     if (tomasCambio) renderTomas();
     pollT = setTimeout(poll, d.job.corriendo ? 900 : 3000);
   }catch(e){

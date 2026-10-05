@@ -10,6 +10,7 @@ from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs
 
 import reel_studio as core
+import actualizador
 import rutas
 import version
 
@@ -57,7 +58,7 @@ if importar_productos()[0]:  # la primera vez (o si la tienda tiene modelos nuev
 
 LOCK = threading.Lock()
 JOB = {"tarea": None, "corriendo": False, "hecho": 0, "total": 0, "mensaje": "", "ok": None, "inicio": 0, "fin": 0}
-LOG, ESTADO = [], {"analisis_v": 0, "guion_v": 0, "etiq_v": 0, "modelos": [], "borrador": None}
+LOG, ESTADO = [], {"analisis_v": 0, "guion_v": 0, "etiq_v": 0, "modelos": [], "borrador": None, "update": None}
 
 
 def guardar_cfg():
@@ -155,6 +156,20 @@ def lanzar(tarea, fn):
 def t_modelos():
     ESTADO["modelos"] = core.modelos()
     return f"{len(ESTADO['modelos'])} modelos de Ollama disponibles"
+
+
+def t_actualizar():
+    def prog(p):
+        with LOCK:
+            JOB["hecho"], JOB["total"] = p, 100
+            JOB["mensaje"] = f"Descargando actualización… {p}%"
+    return actualizador.aplicar(prog)
+
+
+def chequear_update():
+    """Una sola consulta de versión nueva, 5 s después de arrancar (nunca rompe la app)."""
+    time.sleep(5)
+    ESTADO["update"] = actualizador.buscar()
 
 
 def t_analizar():
@@ -291,7 +306,7 @@ class H(BaseHTTPRequestHandler):
                 job = dict(JOB); log = LOG[-120:]
             out = {"version": version.__version__, "cfg": CFG, "archivos": archivos(), "modelos": ESTADO["modelos"], "job": job, "log": log,
                    "borrador": ESTADO["borrador"], "analisis_v": ESTADO["analisis_v"], "guion_v": ESTADO["guion_v"],
-                   "etiq_v": ESTADO["etiq_v"],
+                   "etiq_v": ESTADO["etiq_v"], "update": ESTADO["update"],
                    "ahora": time.time()}
             if v != ESTADO["analisis_v"]:
                 a = leer("analisis.json")
@@ -367,6 +382,10 @@ class H(BaseHTTPRequestHandler):
                     CFG["carpeta"] = c; guardar_cfg()
                     ESTADO["analisis_v"] += 1; ESTADO["guion_v"] += 1; ESTADO["etiq_v"] += 1; ESTADO["borrador"] = None
                 self._json({"carpeta": CFG["carpeta"]})
+            elif u.path == "/api/actualizar":
+                u_ = ESTADO["update"]
+                ok = bool(u_ and u_.get("nueva")) and lanzar("actualizar", t_actualizar)
+                self._json({"ok": ok}, 200 if ok else 409)
             elif u.path.startswith("/api/tarea/"):
                 nombre = u.path.rsplit("/", 1)[1]
                 ok = nombre in TAREAS and lanzar(nombre, TAREAS[nombre])
@@ -440,6 +459,7 @@ def iniciar_servidor(puerto=PUERTO):
     srv = ThreadingHTTPServer(("127.0.0.1", puerto), H)
     threading.Thread(target=srv.serve_forever, daemon=True).start()
     lanzar("modelos", t_modelos)
+    threading.Thread(target=chequear_update, daemon=True).start()
     return srv, f"http://127.0.0.1:{srv.server_address[1]}/"
 
 
@@ -448,6 +468,7 @@ def main():
     url = f"http://127.0.0.1:{PUERTO}/"
     print(f"Reel Studio abierto en {url}  (cierra esta ventana para apagarlo)")
     lanzar("modelos", t_modelos)
+    threading.Thread(target=chequear_update, daemon=True).start()
     if "--no-browser" not in sys.argv:
         threading.Timer(0.8, lambda: webbrowser.open(url)).start()
     srv.serve_forever()
