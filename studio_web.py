@@ -299,6 +299,37 @@ def elegir_carpeta():
     return out.stdout.strip().replace("/", os.sep)
 
 
+def motivo_escena(c, catalogo):
+    """Por qué una escena no valida, nombrando el campo (para el mensaje de /api/guion)."""
+    try:
+        cat = escenas.catalogo().get(c.get("escena"))
+    except (OSError, ValueError):
+        cat = None
+    if not cat:
+        return "la plantilla no existe."
+    if str(c.get("paso", "")) not in cat["pasos"]:
+        return f"el paso «{c.get('paso')}» no admite esta plantilla (admite: {', '.join(cat['pasos'])})."
+    datos = c.get("datos") if isinstance(c.get("datos"), dict) else {}
+    for var, cfg in cat["variables"].items():
+        if var == "imagen":
+            continue
+        v = datos.get(var)
+        if cfg["tipo"] == "string":
+            if not isinstance(v, str) or not v.strip():
+                return f"el campo «{var}» está vacío."
+        else:
+            x = escenas._numero(v)
+            if x is None:
+                return f"el campo «{var}» no es un número."
+            nombre = datos.get("producto") if var == "precio" else str(datos.get(var.replace("_precio", "_nombre"), ""))
+            real = escenas._precio_catalogo(nombre, catalogo)
+            if real is None:
+                return f"«{nombre}» no está en tu catálogo de productos con precio (campo «{var}»)."
+            if abs(real - x) > 0.005:
+                return f"el campo «{var}» vale {x:g} pero «{nombre}» cuesta {real:g} en tu catálogo."
+    return "revisa los textos, el precio y el paso."
+
+
 _ESC_CACHE = [0.0, None]
 
 
@@ -487,12 +518,11 @@ class H(BaseHTTPRequestHandler):
             elif u.path == "/api/guion":  # recibe la serie completa {"videos": [...]}
                 serie = self._body()
                 datos = leer("analisis.json") or {}
-                for sel in serie.get("videos", []):  # una escena editada que no valida se rechaza (no se descarta en silencio)
-                    for c in sel.get("clips", []):
+                for n, sel in enumerate(serie.get("videos", [])):  # una escena editada que no valida se rechaza (no se descarta en silencio)
+                    for i, c in enumerate(sel.get("clips", [])):
                         if core.es_escena(c) and not core.validar_escena_clip(c, CFG.get("catalogo", [])):
-                            return self._json({"ok": False, "error": f"La escena «{c.get('escena')}» no es válida: "
-                                               "revisa que ningún texto esté vacío, que el precio sea el del catálogo de "
-                                               "productos y que el paso sea uno donde encaje esa plantilla."}, 400)
+                            return self._json({"ok": False, "error": f"Reel «{sel.get('titulo') or n + 1}», clip {i + 1}, escena "
+                                               f"«{c.get('escena')}»: {motivo_escena(c, CFG.get('catalogo', []))}"}, 400)
                 for sel in serie.get("videos", []):
                     for c in sel.get("clips", []):
                         if not core.es_escena(c):  # una escena no tiene tramo: su duración sale de sus textos

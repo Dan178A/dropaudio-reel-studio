@@ -82,16 +82,18 @@ def test_guardar_guion_conserva_escena_y_recalcula_segundos(servidor):
     assert json.loads((carpeta / "serie.json").read_text(encoding="utf-8")) == r["guion"]
 
 
-@pytest.mark.parametrize("datos,paso", [
-    (dict(BUENA, precio=1), "cta"),            # precio que no es el del catálogo
-    (dict(BUENA, detalle="  "), "cta"),        # texto vacío
-    (BUENA, "1"),                              # paso donde esa plantilla no encaja
+@pytest.mark.parametrize("datos,paso,campo", [
+    (dict(BUENA, precio=1), "cta", "precio"),            # precio que no es el del catálogo
+    (dict(BUENA, producto="Otro"), "cta", "Otro"),       # producto fuera del catálogo
+    (dict(BUENA, detalle="  "), "cta", "detalle"),       # texto vacío
+    (BUENA, "1", "paso"),                                # paso donde esa plantilla no encaja
 ])
-def test_guardar_escena_invalida_se_rechaza_sin_tocar_el_guion(servidor, datos, paso):
+def test_guardar_escena_invalida_se_rechaza_sin_tocar_el_guion(servidor, datos, paso, campo):
     base, carpeta = servidor
     code, r = pedir(base, "/api/guion", serie(BUENA))
     assert code == 200
     antes = (carpeta / "serie.json").read_text(encoding="utf-8")
     code, r = pedir(base, "/api/guion", serie(datos, paso))
-    assert code == 400 and r["ok"] is False and "precio" in r["error"]
+    assert code == 400 and r["ok"] is False
+    assert "Así compras 1" in r["error"] and "clip 2" in r["error"] and "«precio»" in r["error"] and campo in r["error"]
     assert (carpeta / "serie.json").read_text(encoding="utf-8") == antes

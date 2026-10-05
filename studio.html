@@ -155,6 +155,8 @@ summary::after{content:"＋";color:var(--gold)}details[open] summary::after{cont
 .escvars input{min-height:34px;padding:5px 8px}
 .escdur{font-size:12.5px;color:var(--muted)}
 .escmsg{font-size:12px;color:var(--red)}
+.escvars input[aria-invalid="true"]{border-color:var(--red);box-shadow:0 0 0 1px var(--red)}
+.escvars input[readonly]{opacity:.75;cursor:default}
 
 /* final */
 .done{display:grid;grid-template-columns:auto 1fr;gap:18px;align-items:center;background:linear-gradient(120deg,#231b0f,var(--card));border:1px solid var(--gold3);border-radius:var(--r);padding:18px 20px;margin-bottom:22px}
@@ -428,7 +430,7 @@ function pasosDe(formato){
 }
 let PASOS = pasosDe("asi_compras");
 const videos = () => S.guion?.videos || [];
-let saveT = null;
+let saveT = null, ultimoBloqueo = "";
 
 async function api(path, body){
   const r = await fetch(path, body === undefined ? {} : {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(body)});
@@ -653,20 +655,65 @@ function escPasos(c){  // pasos donde encaja la plantilla (si aún no llega el c
   const ok = S.catEsc?.[c.escena]?.pasos;
   return Object.entries(PASOS).filter(([k]) => !ok || ok.includes(k) || k === c.paso);
 }
-function escVarsHTML(c, i){
+const nombreCorto = n => (String(n || "").replace(/\s*\([^)]*\)/g, "").trim() || String(n || ""));
+function precioCat(nombre){  // precio del catálogo de la app (nombre completo o corto), o null
+  const n = String(nombre || "").trim().toLowerCase(); if (!n) return null;
+  const cat = S.cfg?.catalogo || [];
+  for (const exacto of [true, false]) for (const p of cat){
+    const cand = (exacto ? String(p.nombre || "") : nombreCorto(p.nombre)).toLowerCase();
+    if (cand === n && p.precio != null && p.precio !== "") return +p.precio;
+  }
+  return null;
+}
+const refNombre = (k, c) => k === "precio" ? c.datos?.producto : c.datos?.[k.replace("_precio", "_nombre")];
+function escLista(c){  // [[variable, {tipo, max}]] sin `imagen` (la resuelve el servidor)
   const vars = S.catEsc?.[c.escena]?.variables;
-  const lista = vars ? Object.entries(vars).filter(([k]) => k !== "imagen")
+  return vars ? Object.entries(vars).filter(([k]) => k !== "imagen")
     : Object.keys(c.datos || {}).filter(k => k !== "imagen").map(k => [k, {tipo: typeof c.datos[k] === "number" ? "number" : "string"}]);
-  return lista.map(([k, v]) => v.tipo === "number"
-    ? `<label>${esc(etiquetaVar(k))} ($)<input type="number" min="0" step="0.5" data-i="${i}" data-d="${esc(k)}" data-t="number" value="${esc(c.datos?.[k] ?? "")}"></label>`
+}
+function sincPrecios(c){  // los precios no se escriben: salen del catálogo según el producto elegido
+  c.datos = c.datos || {};
+  for (const [k, v] of escLista(c)) if (v.tipo === "number"){ const pr = precioCat(refNombre(k, c)); c.datos[k] = pr == null ? "" : pr; }
+}
+function escVarsHTML(c, i){
+  return escLista(c).map(([k, v]) => v.tipo === "number"
+    ? `<label>${esc(etiquetaVar(k))} ($, del catálogo)<input type="number" readonly tabindex="-1" data-i="${i}" data-d="${esc(k)}" data-t="number" value="${esc(c.datos?.[k] ?? "")}"></label>`
     : `<label>${esc(etiquetaVar(k))}<input type="text" data-i="${i}" data-d="${esc(k)}" ${v.max ? `maxlength="${+v.max}"` : ""} value="${esc(c.datos?.[k] ?? "")}"></label>`).join("");
 }
-function escIncompleta(){
-  return !!G && G.clips.some(c => esEscena(c) && Object.entries(c.datos || {}).some(([k, v]) => k !== "imagen" && typeof v === "string" && !v.trim()));
+function escProblemas(){  // todas las escenas de todos los reels que hoy no validarían: [{vi, i, k, msg}]
+  const out = [];
+  videos().forEach((v0, n) => {
+    const v = (n === S.vi && G) ? G : v0;
+    (v.clips || []).forEach((c, i) => {
+      if (!esEscena(c)) return;
+      const nom = `Reel «${v.titulo || n + 1}», clip ${i + 1}, escena «${c.escena}»`;
+      for (const [k, t] of escLista(c)){
+        const val = c.datos?.[k];
+        if (t.tipo === "number"){
+          if (val === "" || val == null || isNaN(+val)) out.push({vi:n, i, k, msg:`${nom}: «${refNombre(k, c) || "?"}» no está en tu catálogo de productos con precio (campo «${k}»).`});
+        } else if (typeof val !== "string" || !val.trim()) out.push({vi:n, i, k, msg:`${nom}: el campo «${k}» está vacío.`});
+      }
+    });
+  });
+  return out;
+}
+function refrescarEsc(){  // marca los campos inválidos y escribe el aviso en cada tarjeta de escena
+  if (!G) return;
+  const pr = escProblemas().filter(p => p.vi === S.vi);
+  G.clips.forEach((c, i) => {
+    if (!esEscena(c)) return;
+    const mias = pr.filter(p => p.i === i);
+    document.querySelectorAll(`#clip${i} [data-d]`).forEach(el => {
+      if (mias.some(p => p.k === el.dataset.d)) el.setAttribute("aria-invalid", "true"); else el.removeAttribute("aria-invalid");
+      if (el.readOnly) el.value = c.datos?.[el.dataset.d] ?? "";
+    });
+    const m = $("#escmsg" + i); if (m) m.textContent = mias.map(p => p.msg.split(": ").slice(1).join(": ")).join(" ");
+  });
 }
 function renderGuion(){
   const p = $("#pan-g"), vs = videos();
   if (!G){ $("#nG").textContent = "—"; p.innerHTML = `<div class="empty"><b>Todavía no hay guiones</b>Cuando termines el análisis, elige los formatos en el paso 2 y pulsa <b>Escribir guiones</b>. Saldrá un reel por formato (o más, si hay material) y podrás editar cada uno aquí.</div>`; return; }
+  G.clips.forEach(c => { if (esEscena(c)) sincPrecios(c); });
   const total = G.clips.reduce((s,c)=>s+(+c.segundos||0),0);
   const ok = total >= 28 && total <= 47;
   $("#nG").textContent = vs.length;
@@ -727,6 +774,7 @@ function renderGuion(){
           <button class="iconbtn" aria-label="Quitar clip" data-rm="${i}"><svg width="16" height="16" style="color:var(--red)"><use href="#i-trash"/></svg></button>
         </div>
       </article>`}).join("")}</div>`;
+  refrescarEsc();
 }
 $("#pan-g").addEventListener("input", e => {
   const t = e.target;
@@ -735,9 +783,10 @@ $("#pan-g").addEventListener("input", e => {
   else if (t.id === "gP") G.promesa = t.value;
   else if (t.dataset.d){
     const c = G.clips[t.dataset.i]; c.datos = c.datos || {};
-    c.datos[t.dataset.d] = t.dataset.t === "number" ? (t.value === "" ? "" : parseFloat(t.value)) : t.value;
+    c.datos[t.dataset.d] = t.value;
+    sincPrecios(c);  // si cambió el producto, su precio sale del catálogo
     const d = $("#escdur" + t.dataset.i); if (d) d.textContent = "≈ " + fmt(c.segundos);  // el servidor lo recalcula al guardar
-    const m = $("#escmsg" + t.dataset.i); if (m) m.textContent = escIncompleta() ? "Completa todos los textos para poder guardar." : "";
+    refrescarEsc();
   }
   else if (t.dataset.c === "audio") G.clips[t.dataset.i].audio = t.checked;
   else if (t.dataset.c) G.clips[t.dataset.i][t.dataset.c] = t.dataset.c === "paso" ? t.value : parseFloat(t.value) || 0;
@@ -777,7 +826,12 @@ function guardar(ahora, borrado=false){
   const vi = S.vi;
   if (G && !borrado) S.guion.videos[vi] = {...S.guion.videos[vi], ...fromUI(G)};  // conserva revisión y material del plan
   saveT = setTimeout(async () => {
-    if (escIncompleta()) return;  // una escena con un texto vacío no valida: se guarda cuando esté completa
+    const pr = escProblemas();  // una escena inválida (en cualquier reel) haría fallar todo el guardado
+    if (pr.length){
+      if (ahora || pr[0].msg !== ultimoBloqueo) toast("No guardé el guion. " + pr[0].msg + (pr.length > 1 ? ` (y ${pr.length - 1} problema(s) más)` : ""), true);
+      ultimoBloqueo = pr[0].msg; return;
+    }
+    ultimoBloqueo = "";
     const r = await api("/api/guion", S.guion);
     if (r.ok){ S.guion = r.guion; S.gv = r.guion_v; poll();
       if (!G || vi !== S.vi) return;
