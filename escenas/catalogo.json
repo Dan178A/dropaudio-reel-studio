@@ -21,7 +21,7 @@
       "descripcion": "Cada plantilla usa rutas relativas a su propia carpeta (HyperFrames rechaza '../'). Las fuentes, GSAP y las imágenes viven una sola vez en escenas/ y se copian a la carpeta temporal antes del render.",
       "pasos": [
         "copiar escenas/<tipo>/ (index.html, hyperframes.json, meta.json) a una carpeta temporal",
-        "copiar escenas/fonts/ a <temporal>/fonts/ y escenas/vendor/ a <temporal>/vendor/",
+        "copiar escenas/fonts/ a <temporal>/fonts/ y escenas/vendor/ a <temporal>/vendor/ (los .txt de licencia que van dentro pueden copiarse o no: el render no los usa)",
         "si el producto tiene imagen en escenas/productos/mapa.json: copiar escenas/productos/<archivo> a <temporal>/productos/<archivo> y pasar imagen = \"productos/<archivo>\"; si no tiene, pasar imagen = \"\" (la escena queda solo tipográfica)",
         "reescribir el data-duration del root con la duración calculada (ver 'duracion')",
         "escribir vars.json con los valores y ejecutar en <temporal>: npx --yes hyperframes@0.8.77 render --variables-file vars.json --quality looks --output <salida>.mp4"

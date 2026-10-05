@@ -141,4 +141,6 @@ Sin afiliación ni respaldo de CapCut.
 ## Licencia
 
 MIT © Daniel Alejandro Silva Rojas — ver [LICENSE](LICENSE).
+Las escenas animadas incluyen fuentes (SIL OFL 1.1) y GSAP (licencia estándar de GreenSock): ver
+[escenas/NOTICE.md](escenas/NOTICE.md).
 Portafolio: [my-resume-landing.vercel.app](https://my-resume-landing.vercel.app/) · [LinkedIn](https://www.linkedin.com/in/daniel-alejandro-silva-rojas/)
