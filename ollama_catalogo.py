@@ -20,6 +20,8 @@ import reel_studio as core
 URL_BUSQUEDA = "https://ollama.com/search"
 FILTROS = ("", "vision", "cloud", "tools", "embedding", "thinking")
 TTL = 600  # segundos de cache por (q, filtro)
+# Ollama puede callar mucho rato (verificación sha256, unir capas): lectura muy tolerante.
+TIMEOUT_PULL = 1800
 RE_NOMBRE = re.compile(r"^[a-z0-9][a-z0-9._/-]*(:[a-z0-9._-]+)?$")
 
 _CACHE = {}
@@ -175,7 +177,7 @@ def descargar(modelo, progreso=None):
         data=json.dumps({"model": modelo, "stream": True}).encode(),
         headers={"Content-Type": "application/json"})
     try:
-        with urllib.request.urlopen(req, timeout=60) as r:
+        with urllib.request.urlopen(req, timeout=TIMEOUT_PULL) as r:
             for linea in r:
                 linea = linea.strip()
                 if not linea:
@@ -193,6 +195,10 @@ def descargar(modelo, progreso=None):
                     progreso(d.get("completed") or 0, d.get("total") or 0, d.get("status", ""))
     except urllib.error.HTTPError as e:
         raise RuntimeError(f"Ollama respondió {e.code} al descargar «{modelo}»")
+    except TimeoutError as e:
+        raise RuntimeError(f"Ollama dejó de responder durante la descarga de «{modelo}» (tiempo agotado)") from e
     except (urllib.error.URLError, OSError) as e:
+        if isinstance(getattr(e, "reason", None), TimeoutError):
+            raise RuntimeError(f"Ollama no respondió a tiempo en {core.OLLAMA}") from e
         raise RuntimeError(f"No se pudo conectar con Ollama en {core.OLLAMA}") from e
     return f"Modelo «{modelo}» listo"

@@ -149,3 +149,30 @@ def test_descargar_sin_ollama(monkeypatch):
     monkeypatch.setattr(oc.urllib.request, "urlopen", falla)
     with pytest.raises(RuntimeError, match="No se pudo conectar con Ollama en"):
         oc.descargar("gemma3")
+
+
+def test_descargar_timeout_de_lectura_no_es_error_de_conexion(monkeypatch):
+    class Lenta:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+        def __iter__(self):
+            raise TimeoutError("timed out")
+    monkeypatch.setattr(oc.urllib.request, "urlopen", lambda req, timeout=None: Lenta())
+    with pytest.raises(RuntimeError) as e:
+        oc.descargar("gemma3")
+    assert "No se pudo conectar" not in str(e.value) and "tiempo agotado" in str(e.value)
+
+
+def test_descargar_usa_timeout_largo(monkeypatch):
+    vistos = []
+
+    def falso(req, timeout=None):
+        vistos.append(timeout)
+        return _ndjson({"status": "success"})
+    monkeypatch.setattr(oc.urllib.request, "urlopen", falso)
+    oc.descargar("gemma3")
+    assert vistos[0] >= 600
