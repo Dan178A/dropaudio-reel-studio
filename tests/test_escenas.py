@@ -210,3 +210,14 @@ def test_disponible_cacheado(monkeypatch):
     es.disponible()
     monkeypatch.setattr(es.shutil, "which", lambda n: None)
     assert es.disponible()[0] is True
+
+
+def test_duracion_precio_y_cta_corto_menor_que_largo():
+    pc = {"producto": "KZ AE01", "precio": 5, "detalle": "Bluetooth 5.3"}
+    pl = {"producto": "KZ Castor Pro (Harman) edición", "precio": 13, "detalle": "palabra " * 8}
+    cc = {"linea": "Lo pruebas"}
+    cl = {"linea": "palabra " * 10}
+    assert es.duracion("precio", pc) < es.duracion("precio", pl)
+    assert es.duracion("cta", cc) < es.duracion("cta", cl)
+    assert 5 <= es.duracion("precio", pc) <= 7
+    assert 5 <= es.duracion("cta", cc) <= 6

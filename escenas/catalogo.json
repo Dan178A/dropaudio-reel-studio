@@ -5,7 +5,7 @@
     "patron_regex": "(<div id=\"root\"[^>]*?data-duration=\")[0-9.]+(\")",
     "reemplazo": "\\g<1>{segundos}\\g<2>",
     "formato_segundos": "número con hasta 2 decimales, p. ej. 6.4",
-    "formula": "duracion = clamp(entrada + max(lectura, minimo_por_bloque * n_bloques_visibles) + pausa_final + salida, dur_min, dur_max); lectura = palabras visibles (variables de 'bloques' + 'texto_fijo') / palabras_por_segundo",
+    "formula": "duracion = clamp(entrada + max(lectura, minimo_por_bloque * n_bloques_visibles) + pausa_final + salida, dur_min, dur_max); lectura = palabras de las variables de 'bloques' / palabras_por_segundo (el texto_fijo es kicker/CTA que ya se lee durante la entrada y no suma); cada tipo puede sobrescribir pausa_final",
     "palabras_por_segundo": 2.5,
     "minimo_por_bloque": 1.5,
     "pausa_final": 1.0,
@@ -38,9 +38,9 @@
     "dur_max": 9.0,
     "entrada": 2.8,
     "salida": 0.5,
+    "pausa_final": 0.5,
     "bloques": [
       "producto",
-      "precio",
       "detalle"
     ],
     "texto_fijo": "Llévatelo por",

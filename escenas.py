@@ -13,11 +13,14 @@ import subprocess
 import sys
 import tempfile
 
-import reel_studio as core
-
 HYPERFRAMES = "0.8.77"
 TIMEOUT_RENDER = 300  # segundos
 _RE_DURACION = r'(<div id="root"[^>]*?data-duration=")[0-9.]+(")'
+
+
+def _nombre_corto(p):
+    """«KZ AE01 (Adaptador BT)» -> «KZ AE01» (misma regla que reel_studio.nombre_corto)."""
+    return re.sub(r"\s*\([^)]*\)", "", p or "").strip() or p
 
 
 def _carpeta_escenas():
@@ -39,7 +42,10 @@ def disponible():
     """(bool, motivo): hace falta Node >= 22 y ffmpeg en el PATH. Cacheado."""
     global _DISPONIBLE
     if _DISPONIBLE is None:
-        _DISPONIBLE = _comprobar()
+        r = _comprobar()
+        if not r[0]:
+            return r  # no se cachea un fallo: el usuario puede instalar Node sin reiniciar
+        _DISPONIBLE = r
     return _DISPONIBLE
 
 
@@ -95,7 +101,7 @@ def _imagen_de(nombre):
         if k.lower() == n:
             return v
     for k, v in mapa.items():
-        if (core.nombre_corto(k) or "").lower() == n:
+        if (_nombre_corto(k) or "").lower() == n:
             return v
     return ""
 
@@ -111,9 +117,9 @@ def duracion(tipo, datos):
     mec = _mecanismo()
     pps = mec.get("palabras_por_segundo", 2.5)
     minimo = mec.get("minimo_por_bloque", 1.5)
-    pausa = mec.get("pausa_final", 1.0)
+    pausa = cat.get("pausa_final", mec.get("pausa_final", 1.0))
     datos = datos or {}
-    palabras = _palabras(cat.get("texto_fijo", ""))
+    palabras = 0  # el texto fijo (kicker/CTA) se lee durante la entrada: no suma
     for b in cat["bloques"]:
         palabras += _palabras(datos.get(b, ""))
     lectura = max(palabras / pps, minimo * len(cat["bloques"]))
@@ -144,7 +150,7 @@ def _precio_catalogo(nombre, catalogo_precios):
     for exacto in (True, False):
         for p in catalogo_precios or []:
             nom = p.get("nombre") or ""
-            cand = nom.lower() if exacto else (core.nombre_corto(nom) or "").lower()
+            cand = nom.lower() if exacto else (_nombre_corto(nom) or "").lower()
             if cand == n and p.get("precio") is not None:
                 return float(p["precio"])
     return None
@@ -260,5 +266,6 @@ def render(tipo, datos, cache_dir, dur=None):
                     and "hyperframes" in texto.lower():
                 raise RuntimeError("HyperFrames no está descargado; conéctate a internet una vez.\n" + ultimas)
             raise RuntimeError("Falló el render de la escena «%s»:\n%s" % (tipo, ultimas))
-        shutil.move(salida, destino)
+        shutil.move(salida, destino + ".part")
+        os.replace(destino + ".part", destino)
     return destino
