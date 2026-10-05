@@ -18,6 +18,7 @@ __pycache__/
 *.pyc
 build/
 dist/
+Releases/
 
 # Generados por la app
 reel_studio.log

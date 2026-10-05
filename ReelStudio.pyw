@@ -38,6 +38,11 @@ def al_cerrar():
 
 
 def main():
+    try:  # hooks de instalación/desinstalación de Velopack (no hace nada fuera de una instalación)
+        import velopack
+        velopack.App().run()
+    except Exception:
+        pass
     global ventana
     _, url = studio_web.iniciar_servidor(0)  # puerto libre, solo en esta PC
     ventana = webview.create_window(f"Reel Studio {__version__} · DropAudio CCS", url, js_api=Api(), width=1440, height=920,

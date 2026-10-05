@@ -2,9 +2,9 @@
 from PyInstaller.utils.hooks import collect_submodules
 from PyInstaller.utils.hooks import collect_all
 
-datas = [('studio.html', '.'), ('productos.json', '.'), ('../pyCapCut/pycapcut/assets', 'pycapcut/assets')]
+datas = [('studio.html', '.'), ('productos.json', '.'), ('ollama_curados.json', '.'), ('../pyCapCut/pycapcut/assets', 'pycapcut/assets')]
 binaries = []
-hiddenimports = ['gen_music', 'pillow_heif', 'pycapcut', 'imageio']
+hiddenimports = ['gen_music', 'pillow_heif', 'pycapcut', 'imageio', 'velopack']
 hiddenimports += collect_submodules('pycapcut')
 tmp_ret = collect_all('pymediainfo')
 datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]

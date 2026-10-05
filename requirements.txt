@@ -5,3 +5,4 @@ numpy
 pywebview
 pymediainfo
 imageio
+velopack

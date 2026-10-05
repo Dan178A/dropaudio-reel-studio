@@ -116,6 +116,16 @@ ffmpeg -i renders/reel-studio-motion.mp4 -vf "fps=15,scale=960:-1:flags=lanczos,
 - Privacidad: de las capturas de ventas solo se usan los productos, nunca nombres ni teléfonos de
   clientes.
 
+## Publicar una versión
+
+1. Sube `__version__` en `version.py` (por ejemplo `1.1.0`) y haz commit.
+2. Crea el tag con el mismo número: `git tag v1.1.0`.
+3. Súbelo: `git push --tags`.
+
+La Action `.github/workflows/release.yml` compila, empaqueta con Velopack y publica el instalador y las
+actualizaciones en GitHub Releases (falla si el tag no coincide con `version.py`). Para probar el instalador
+sin publicar: `Crear_instalador.bat` (genera `Releases\`).
+
 ## Alcance y créditos
 
 Es una herramienta interna que construí para mi propia tienda, publicada tal cual — no es un producto
