@@ -42,16 +42,18 @@ Fecha: 2026-10-04 · Rama: `feat/versiones-actualizaciones-ollama`
 (`"version"`), la barra lateral de `studio.html` y la Action (que falla si el tag ≠ `v` + `__version__`).
 
 ### B. Carpeta de datos estable — `rutas.py`
-Velopack instala en `%LOCALAPPDATA%\ReelStudio\current\` y **reemplaza esa carpeta en cada update**. Hoy
-`studio_config.json`, `reel_studio.log` y la carpeta de videos por defecto viven junto al `.exe` → se perderían.
+Velopack instala en `%LOCALAPPDATA%\ReelStudio\current\`, **reemplaza esa carpeta en cada update** y borra todo el `packId`
+(`%LOCALAPPDATA%\ReelStudio`) al desinstalar/reinstalar. Los datos del usuario no pueden vivir ahí.
 
-- `rutas.datos()` → si `sys.frozen`: `%LOCALAPPDATA%\ReelStudio\datos` (se crea); si no: carpeta del script (sin cambio
-  en desarrollo).
+- `rutas.datos()` → si `sys.frozen`: `%APPDATA%\ReelStudio` (Roaming; si falta `APPDATA`, `~\ReelStudio`; se crea); si no: carpeta
+  del script (sin cambio en desarrollo).
+- `rutas.videos_defecto()` → congelado: `%USERPROFILE%\Videos\Reel Studio`; desarrollo: `<script>\Videos Dropaudioccs`.
 - `rutas.migrar_datos()` → solo congelado: si `datos/studio_config.json` no existe y existe junto al exe, lo copia
-  (una vez). No borra nada.
-- `studio_web.BASE`, `ReelStudio.pyw` (log) y `reel_studio.AQUI` (carpeta de videos por defecto) usan `rutas.datos()`.
-  Los recursos empaquetados siguen en `RES = sys._MEIPASS`. `reel_studio.py:933` (fuentes) sigue apuntando a recursos
-  de la app, no a datos.
+  (una vez). No borra nada. Para instalaciones con Setup apenas aplica: el README documenta cómo copiar a mano un
+  `studio_config.json` existente a `%APPDATA%\ReelStudio`.
+- `studio_web.BASE` y `ReelStudio.pyw` (log) usan `rutas.datos()`; la carpeta de videos por defecto usa
+  `rutas.videos_defecto()`; la caché de fuentes de `reel_studio.fuente()` va en `rutas.datos()/fonts` (no en `current\`,
+  que se limpia en cada update). Los recursos empaquetados siguen en `RES = sys._MEIPASS`.
 
 ### C. Empaquetado y publicación
 - `ReelStudio.spec`: agrega `version.py` implícito (es import), `ollama_curados.json` a `datas`, `velopack` a

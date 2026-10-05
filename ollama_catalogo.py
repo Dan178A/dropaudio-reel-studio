@@ -165,7 +165,7 @@ def buscar(q="", filtro=""):
 
 # ------------------------------------------------------------------ descarga
 def nombre_valido(modelo):
-    return bool(isinstance(modelo, str) and RE_NOMBRE.match(modelo))
+    return bool(isinstance(modelo, str) and RE_NOMBRE.fullmatch(modelo))
 
 
 def descargar(modelo, progreso=None):

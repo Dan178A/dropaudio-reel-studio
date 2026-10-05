@@ -176,3 +176,8 @@ def test_descargar_usa_timeout_largo(monkeypatch):
     monkeypatch.setattr(oc.urllib.request, "urlopen", falso)
     oc.descargar("gemma3")
     assert vistos[0] >= 600
+
+
+def test_nombre_valido_rechaza_salto_de_linea_final():
+    assert oc.nombre_valido("llama3:8b")
+    assert not oc.nombre_valido("llama3:8b\n")

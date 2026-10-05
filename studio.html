@@ -963,7 +963,8 @@ const oInstalado = (n, tag) => {
   const nom = new Set(((S.modelos || [])).map(m => m[0]));
   return tag ? nom.has(`${n}:${tag}`) : (nom.has(n) || nom.has(n + ":latest"));
 };
-const oSel = m => O.sel[m.nombre] ?? (m.cloud && !(m.tamanos || []).length ? "cloud" : "");
+const oSoloCloud = m => !!m.cloud && !(m.tamanos || []).length;  // solo estos modelos llevan chip "cloud" (nombre:cloud)
+const oSel = m => O.sel[m.nombre] ?? (oSoloCloud(m) ? "cloud" : "");
 const oNombre = m => { const t = oSel(m); return t ? `${m.nombre}:${t}` : m.nombre; };
 const oMsg = (txt, err=true) => { const e = $("#oMsg"); e.textContent = txt || ""; e.hidden = !txt; e.style.color = err ? "var(--bad, #e5484d)" : ""; };
 function oRender(){
@@ -971,7 +972,7 @@ function oRender(){
   if (!O.lista.length){ r.innerHTML = '<div class="help">Sin resultados.</div>'; return; }
   r.innerHTML = O.lista.map((m, i) => {
     const t = oSel(m), inst = oInstalado(m.nombre, t);
-    const chips = [...(m.tamanos || []), ...(m.cloud ? ["cloud"] : [])].map(x =>
+    const chips = (oSoloCloud(m) ? ["cloud"] : (m.tamanos || [])).map(x =>
       `<button class="chip sm" data-i="${i}" data-t="${esc(x)}" aria-pressed="${t === x}">${esc(x)}</button>`).join("");
     const caps = (m.capacidades || []).map(c => `<span class="otag">${esc(c)}</span>`).join("");
     return `<div class="ocard"><h4>${esc(m.nombre)}${inst ? '<span class="oinst">Instalado</span>' : ""}</h4>
@@ -1003,7 +1004,7 @@ document.querySelector(".ofilt").onclick = e => {
 };
 $("#oRes").onclick = async e => {
   const c = e.target.closest("[data-t]");
-  if (c){ const m = O.lista[+c.dataset.i]; O.sel[m.nombre] = oSel(m) === c.dataset.t ? "" : c.dataset.t; oRender(); return; }
+  if (c){ const m = O.lista[+c.dataset.i]; if (oSoloCloud(m)) return; O.sel[m.nombre] = oSel(m) === c.dataset.t ? "" : c.dataset.t; oRender(); return; }
   const b = e.target.closest("[data-dl]"); if (!b) return;
   const m = O.lista[+b.dataset.dl];
   try{

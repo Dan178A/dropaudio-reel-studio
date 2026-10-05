@@ -5,4 +5,4 @@ numpy
 pywebview
 pymediainfo
 imageio
-velopack
+velopack==1.2.161

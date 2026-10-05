@@ -56,8 +56,12 @@ jobs:
         with:
           dotnet-version: '8.0.x'
 
-      - name: Instalar vpk
-        run: dotnet tool install -g vpk
+      - name: Instalar vpk (misma versión que el paquete pip velopack)
+        shell: pwsh
+        run: |
+          $v = (Select-String -Path reel-capcut/requirements.txt -Pattern '^velopack==(.+)$').Matches[0].Groups[1].Value.Trim()
+          dotnet tool install -g vpk --version $v
+          "$env:USERPROFILE\.dotnet\tools" | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
 
       - name: Descargar releases previos (para deltas)
         working-directory: reel-capcut
@@ -70,6 +74,7 @@ jobs:
         run: |
           $previo = git describe --tags --abbrev=0 "${{ github.ref_name }}^" 2>$null
           if ($LASTEXITCODE -eq 0 -and $previo) { $rango = "$previo..${{ github.ref_name }}" } else { $rango = "${{ github.ref_name }}" }
+          [Console]::OutputEncoding = [Text.Encoding]::UTF8
           $lineas = git log $rango --pretty=format:"- %s"
           if (-not $lineas) { $lineas = "- Mejoras internas" }
           $lineas | Set-Content -Encoding utf8 notas.md

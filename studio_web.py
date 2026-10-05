@@ -16,14 +16,15 @@ import ollama_catalogo
 import version
 
 PUERTO = 8765
-# BASE: donde viven tus datos (config, carpeta de videos). RES: archivos de la app (html). Iguales salvo en el .exe.
+# BASE: donde viven tus datos (config, log, fuentes). RES: archivos de la app (html). En el .exe BASE (%APPDATA%\ReelStudio) y
+# RES (el paquete) son carpetas distintas; en desarrollo son la misma carpeta del script.
 BASE = rutas.datos()
 RES = getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__)))
 AQUI = BASE
 rutas.migrar_datos()
 CFG_FILE = os.path.join(BASE, "studio_config.json")
 
-CFG = {"carpeta": os.path.join(AQUI, "Videos Dropaudioccs"), "vision": "gemma3:4b", "jev": "nimble:latest",
+CFG = {"carpeta": rutas.videos_defecto(), "vision": "gemma3:4b", "jev": "nimble:latest",
        "escritor": "glm-5.3:cloud", "whisper": "small", "paso": 3.0, "minimo": 0.5, "drafts": core.CAPCUT_DRAFTS,
        "vol_clips": 1.0, "vol_musica": 0.25, "musica": True, "nombre": "reel_auto_01", "rehacer": False,
        "simultaneos": 6, "saltar_repetidos": True, "formatos": list(core.ORDEN_FORMATOS), "max_por_formato": 2, "catalogo": [],
@@ -173,7 +174,10 @@ def t_descargar_modelo(modelo):
             JOB["hecho"], JOB["total"] = hecho, total
             JOB["mensaje"] = f"{modelo}: {estado}" + (f" ({hecho * 100 // total}%)" if total else "")
     msg = ollama_catalogo.descargar(modelo, prog)
-    ESTADO["modelos"] = core.modelos()
+    try:
+        ESTADO["modelos"] = core.modelos()
+    except Exception:
+        pass  # la descarga ya terminó bien; la lista se refrescará en la próxima consulta
     return msg
 
 
@@ -373,7 +377,18 @@ class H(BaseHTTPRequestHandler):
         else:
             self.send_response(404); self.end_headers()
 
+    def _origen_valido(self):
+        """Anti-CSRF: una página web externa no puede disparar acciones POST contra el servidor local."""
+        o = self.headers.get("Origin")
+        if o is None:
+            return True
+        puerto = self.server.server_address[1]
+        return o in (f"http://127.0.0.1:{puerto}", f"http://localhost:{puerto}")
+
     def do_POST(self):
+        if not self._origen_valido():
+            self._json({"ok": False, "error": "Origen no permitido"}, 403)
+            return
         u = urlparse(self.path)
         try:
             if u.path == "/api/cfg":

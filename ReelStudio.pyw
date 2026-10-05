@@ -7,14 +7,24 @@ Requisito extra:  pip install pywebview
 """
 import os, sys
 
-# Sin consola (pythonw) no hay stdout: los mensajes van a reel_studio.log junto a la app
 BASE = os.path.dirname(sys.executable) if getattr(sys, "frozen", False) else os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, BASE)
-import rutas
-from version import __version__
+import rutas  # módulo hoja: solo calcula carpetas (sin efectos secundarios más allá de crear la carpeta de datos)
+# Sin consola (pythonw) no hay stdout: los mensajes van a reel_studio.log en la carpeta de datos
 if sys.stdout is None or sys.stderr is None:
     sys.stdout = sys.stderr = open(os.path.join(rutas.datos(), "reel_studio.log"), "a", encoding="utf-8", buffering=1)
 
+# Hooks de instalación/desinstalación/actualización de Velopack: deben correr ANTES de importar webview/studio_web
+# (esos módulos migran y escriben configuración, y los hooks tienen pocos segundos para terminar).
+try:
+    import velopack
+    velopack.App().run()
+except ImportError:
+    print("velopack no está instalado: se omiten los hooks de instalación")
+except Exception as e:
+    print(f"velopack: error en los hooks de instalación: {e!r}")
+
+from version import __version__
 import webview
 import studio_web
 
@@ -38,11 +48,6 @@ def al_cerrar():
 
 
 def main():
-    try:  # hooks de instalación/desinstalación de Velopack (no hace nada fuera de una instalación)
-        import velopack
-        velopack.App().run()
-    except Exception:
-        pass
     global ventana
     _, url = studio_web.iniciar_servidor(0)  # puerto libre, solo en esta PC
     ventana = webview.create_window(f"Reel Studio {__version__} · DropAudio CCS", url, js_api=Api(), width=1440, height=920,

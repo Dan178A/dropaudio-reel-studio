@@ -126,6 +126,11 @@ La Action `.github/workflows/release.yml` compila, empaqueta con Velopack y publ
 actualizaciones en GitHub Releases (falla si el tag no coincide con `version.py`). Para probar el instalador
 sin publicar: `Crear_instalador.bat` (genera `Releases\`).
 
+**Datos del usuario (instalación con Setup).** La configuración (`studio_config.json`), el log y la caché de fuentes
+viven en `%APPDATA%\ReelStudio` y los videos por defecto en `Videos\Reel Studio`, fuera de la carpeta que Velopack
+reemplaza en cada actualización y borra al desinstalar. Si ya tenías un `studio_config.json` de la versión portable,
+cópialo a `%APPDATA%\ReelStudio` antes de abrir la app por primera vez.
+
 ## Alcance y créditos
 
 Es una herramienta interna que construí para mi propia tienda, publicada tal cual — no es un producto
