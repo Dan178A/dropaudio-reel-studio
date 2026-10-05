@@ -1,0 +1,153 @@
+<!doctype html>
+<html
+  lang="es"
+  data-composition-variables='[
+    {"id":"titulo","type":"string","label":"Título","default":"3 cosas que sí notas al usar KZ","maxLength":40},
+    {"id":"dato1","type":"string","label":"Dato 1","default":"Bajos con cuerpo, sin tapar las voces","maxLength":50},
+    {"id":"dato2","type":"string","label":"Dato 2","default":"Cable desmontable: si se daña, lo cambias","maxLength":50},
+    {"id":"dato3","type":"string","label":"Dato 3","default":"Aíslan el ruido sin subir tanto el volumen","maxLength":50}
+  ]'
+>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1080, height=1920" />
+    <title>DropAudio CCS · Escena tres datos</title>
+    <script src="vendor/gsap.min.js"></script>
+    <style>
+      @font-face { font-family: "Space Grotesk"; src: url("fonts/space-grotesk-latin-700-normal.woff2") format("woff2"); font-weight: 700; }
+      @font-face { font-family: "Plus Jakarta Sans"; src: url("fonts/plus-jakarta-sans-latin-600-normal.woff2") format("woff2"); font-weight: 600; }
+      @font-face { font-family: "Plus Jakarta Sans"; src: url("fonts/plus-jakarta-sans-latin-700-normal.woff2") format("woff2"); font-weight: 700; }
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body { width: 1080px; height: 1920px; overflow: hidden; background: #090807; }
+      #root { position: relative; width: 100%; height: 100%; overflow: hidden; background: #090807; color: #f0ede8; font-family: "Plus Jakarta Sans", sans-serif; }
+      .capa { position: absolute; inset: 0; }
+      /* Acabado (pseudo-elementos para no tapar el texto ante el auditor): viñeta y grano */
+      #fondo { background: radial-gradient(120% 75% at 50% 45%, #1a150d 0%, #0c0b09 55%, #090807 100%); }
+      #resplandor { position: absolute; left: -200px; top: 300px; width: 900px; height: 900px; border-radius: 50%; background: #cda860; opacity: 0.14; filter: blur(200px); }
+      .polvo { position: absolute; border-radius: 50%; background: #e7c98a; }
+      #root::after { content: ""; position: absolute; inset: 0; z-index: 10; pointer-events: none; background: radial-gradient(95% 70% at 50% 48%, rgba(0,0,0,0) 52%, rgba(0,0,0,0.78) 100%); }
+      #root::before { content: ""; position: absolute; inset: -40px; z-index: 11; pointer-events: none; opacity: 0.07; mix-blend-mode: overlay;
+        background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='220' height='220'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>"); }
+      #logo { position: absolute; top: 210px; left: 0; right: 0; display: flex; justify-content: center; align-items: center; gap: 14px; font-family: "Space Grotesk", sans-serif; font-weight: 700; font-size: 34px; letter-spacing: -0.02em; }
+      #logo svg { width: 44px; height: 44px; display: block; }
+      #logo .p { color: #cda860; }
+      #escenario { position: absolute; left: 80px; right: 80px; top: 300px; bottom: 400px; display: flex; flex-direction: column; justify-content: center; }
+      #titulo { font-family: "Space Grotesk", sans-serif; font-weight: 700; font-size: 112px; line-height: 1.0; letter-spacing: -0.045em; }
+      #titulo-raya { width: 160px; height: 8px; border-radius: 4px; background: #cda860; margin: 44px 0 60px; transform-origin: 0 50%; }
+      #lista { position: relative; display: flex; flex-direction: column; gap: 36px; }
+      #riel { position: absolute; left: 41px; top: 20px; bottom: 20px; width: 4px; border-radius: 2px; background: linear-gradient(180deg, #cda860, rgba(205,168,96,0.15)); transform-origin: 50% 0; }
+      .dato { position: relative; display: flex; align-items: center; gap: 34px; padding: 36px 36px 36px 0; }
+      .num { position: relative; flex: none; width: 86px; height: 86px; border-radius: 50%; background: #cda860; color: #14110c; display: flex; align-items: center; justify-content: center; font-family: "Space Grotesk", sans-serif; font-weight: 700; font-size: 46px; box-shadow: 0 0 0 10px #0f0d0a, 0 18px 40px rgba(0,0,0,0.5); }
+      .txt { flex: 1; font-size: 56px; line-height: 1.22; font-weight: 700; color: #f0ede8; letter-spacing: -0.01em; }
+      .fondo-dato { position: absolute; left: 60px; right: -30px; top: 0; bottom: 0; border-radius: 28px; background: linear-gradient(90deg, rgba(205,168,96,0.13), rgba(205,168,96,0.02)); border: 2px solid rgba(205,168,96,0.22); transform-origin: 0 50%; }
+      .dato .num, .dato .txt { z-index: 1; }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="9" data-width="1080" data-height="1920">
+      <div id="fondo" class="capa"><div id="resplandor"></div><div id="polvo" class="capa"></div></div>
+
+      <div id="logo">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#cda860" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12h3l2-6 4 14 4-18 3 10h4" /></svg>
+        <span>DropAudio<span class="p">·</span>CCS</span>
+      </div>
+
+      <div id="escenario">
+        <div id="titulo" data-var-text="titulo">3 cosas que sí notas al usar KZ</div>
+        <div id="titulo-raya"></div>
+        <div id="lista">
+          <div id="riel"></div>
+          <div class="dato" id="d1"><div class="fondo-dato"></div><div class="num">1</div><div class="txt" id="dato1" data-var-text="dato1">Bajos con cuerpo, sin tapar las voces</div></div>
+          <div class="dato" id="d2"><div class="fondo-dato"></div><div class="num">2</div><div class="txt" id="dato2" data-var-text="dato2">Cable desmontable: si se daña, lo cambias</div></div>
+          <div class="dato" id="d3"><div class="fondo-dato"></div><div class="num">3</div><div class="txt" id="dato3" data-var-text="dato3">Aíslan el ruido sin subir tanto el volumen</div></div>
+        </div>
+      </div>
+
+    </div>
+
+    <script>
+      // La duración total sale del data-duration del root (Reel Studio lo reescribe antes de renderizar).
+      const root = document.getElementById("root");
+      const D = Math.max(3, parseFloat(root.dataset.duration) || 9);
+      const V = (window.__hyperframes && window.__hyperframes.getVariables) ? window.__hyperframes.getVariables() : {};
+      const val = (k, def) => String(V[k] != null ? V[k] : def);
+      const T = { titulo: val("titulo", ""), dato1: val("dato1", ""), dato2: val("dato2", ""), dato3: val("dato3", "") };
+
+      function prng(seed) { let s = seed >>> 0; return () => ((s = (s * 1664525 + 1013904223) >>> 0) / 4294967296); }
+      // Reduce el tamaño de letra hasta que el texto quepa en maxLineas (mide sin padding ni borde; solo al armar).
+      function ajustar(el, px, minPx, maxLineas, lh) {
+        const alto = () => {
+          const cs = getComputedStyle(el);
+          return el.getBoundingClientRect().height - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom) - parseFloat(cs.borderTopWidth) - parseFloat(cs.borderBottomWidth);
+        };
+        el.style.fontSize = px + "px";
+        while (px > minPx && alto() > px * lh * maxLineas + 2) { px -= 4; el.style.fontSize = px + "px"; }
+        return px;
+      }
+      const palabras = (s) => s.trim() ? s.trim().split(/\s+/).length : 0;
+
+      function construir() {
+        document.getElementById("titulo").textContent = T.titulo;
+        const ids = ["dato1", "dato2", "dato3"];
+        ids.forEach((id) => (document.getElementById(id).textContent = T[id]));
+        ajustar(document.getElementById("titulo"), 112, 64, 2, 1.0);
+        // Los tres datos con el mismo tamaño (el del más largo) para que la lista se vea pareja.
+        let px = 56;
+        ids.forEach((id) => { px = Math.min(px, ajustar(document.getElementById(id), px, 36, 2, 1.22)); });
+        ids.forEach((id) => (document.getElementById(id).style.fontSize = px + "px"));
+
+        const rnd = prng(23), polvo = [];
+        const campo = document.getElementById("polvo");
+        for (let i = 0; i < 30; i++) {
+          const d = document.createElement("div"); d.className = "polvo";
+          const sz = 2.5 + rnd() * 6; d.style.width = d.style.height = sz.toFixed(1) + "px";
+          d.style.left = (rnd() * 1080).toFixed(0) + "px"; d.style.top = (120 + rnd() * 1750).toFixed(0) + "px";
+          d.style.opacity = (0.12 + rnd() * 0.4).toFixed(2);
+          if (sz > 6.5) d.style.filter = "blur(2px)";
+          d.dataset.dy = (90 + rnd() * 260).toFixed(0); d.dataset.dx = ((rnd() - 0.5) * 90).toFixed(0);
+          campo.appendChild(d); polvo.push(d);
+        }
+
+        const tl = gsap.timeline({ paused: true });
+        const EX = "expo.out";
+        const SALIDA = 0.5, tSal = D - SALIDA;
+
+        polvo.forEach((d) => tl.fromTo(d, { x: 0, y: 0 }, { x: +d.dataset.dx, y: -d.dataset.dy, duration: D, ease: "none" }, 0));
+        tl.fromTo("#resplandor", { opacity: 0.06, x: 0 }, { opacity: 0.16, x: 320, duration: D, ease: "sine.inOut" }, 0);
+        tl.fromTo("#escenario", { scale: 1 }, { scale: 1.025, duration: D, ease: "none" }, 0);
+
+        tl.fromTo("#logo", { opacity: 0, y: -24 }, { opacity: 1, y: 0, duration: 0.6, ease: EX }, 0.05);
+        tl.fromTo("#titulo", { opacity: 0, y: 70, filter: "blur(14px)" }, { opacity: 1, y: 0, filter: "blur(0px)", duration: 0.9, ease: EX }, 0.15);
+        tl.fromTo("#titulo-raya", { scaleX: 0 }, { scaleX: 1, duration: 0.8, ease: EX }, 0.5);
+
+        // Reparto: el título se lee primero; luego cada dato entra con tiempo de lectura proporcional a sus palabras.
+        const tTitulo = 0.15 + Math.min(2.0, Math.max(1.2, palabras(T.titulo) / 2.5));
+        const pesos = ids.map((id) => Math.max(3, palabras(T[id])));
+        const ultimoMin = 1.5;                       // el último dato queda al menos 1,5 s antes de salir
+        const util = Math.max(2.0, tSal - ultimoMin - tTitulo);
+        const sumaPrevios = pesos[0] + pesos[1];
+        let t = tTitulo;
+        const inicios = [];
+        for (let i = 0; i < 3; i++) {
+          inicios.push(t);
+          if (i < 2) t += Math.max(0.9, util * pesos[i] / sumaPrevios);
+        }
+        tl.fromTo("#riel", { scaleY: 0 }, { scaleY: 1, duration: Math.max(1, inicios[2] - inicios[0] + 0.6), ease: "power2.inOut" }, inicios[0]);
+        ["#d1", "#d2", "#d3"].forEach((sel, i) => {
+          const ti = inicios[i];
+          tl.fromTo(sel + " .num", { scale: 0, rotation: -90 }, { scale: 1, rotation: 0, duration: 0.6, ease: "back.out(2.2)" }, ti);
+          tl.fromTo(sel + " .fondo-dato", { scaleX: 0, opacity: 0 }, { scaleX: 1, opacity: 1, duration: 0.8, ease: EX }, ti + 0.1);
+          tl.fromTo(sel + " .txt", { opacity: 0, x: 60 }, { opacity: 1, x: 0, duration: 0.7, ease: EX }, ti + 0.15);
+        });
+
+        tl.to(["#escenario", "#logo"], { opacity: 0, y: -50, filter: "blur(10px)", duration: SALIDA, ease: "power3.in" }, tSal);
+        window.__timelines["main"] = tl;
+      }
+
+      Promise.all([
+        document.fonts.load('700 100px "Space Grotesk"'),
+        document.fonts.load('700 40px "Plus Jakarta Sans"'),
+      ]).then(construir, construir);
+    </script>
+  </body>
+</html>
