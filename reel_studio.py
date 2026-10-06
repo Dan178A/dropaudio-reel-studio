@@ -100,7 +100,7 @@ FORMATOS = {
                    ("5", ["persona", "prueba_sonido"]), ("cta", ["producto_detalle", "persona"])]},
     "educativo": {
         "titulo": "Educativo", "kicker": "DATO", "por_producto": True, "reusa": True,
-        "gancho_ej": "3 cosas que nadie te dice de estos KZ", "gancho_prod": "3 cosas del {p} antes de comprarlo",
+        "gancho_ej": "Lo que nadie te dice de estos KZ", "gancho_prod": "Lo que debes saber del {p} antes de comprarlo",
         "promesa": "Míralo antes de comprar ↓",
         "pasos": {"1": "Dato 1", "2": "Dato 2", "3": "Dato 3", "4": "Para quién es", "5": "Precio"},
         "estructura": "gancho (pregunta o mito) -> 1 primer dato útil -> 2 segundo dato -> 3 tercer dato -> "
@@ -573,6 +573,43 @@ def sin_cortar_frases(d, desde, hasta, maximo=12.0):
     return max(0.0, a), min(d["dur"] - 0.05, b)
 
 
+def habla_del_clip(d, desde, segundos):
+    """Frases de Whisper que caen dentro del clip, con tiempos relativos al clip (recortadas a sus bordes)."""
+    hasta, out = desde + segundos, []
+    for h in (d or {}).get("habla", []):
+        a, b = max(h["ini"], desde), min(h["fin"], hasta)
+        if b - a > 0.2 and h.get("texto", "").strip():
+            out.append({"ini": round(a - desde, 2), "fin": round(b - desde, 2), "texto": h["texto"].strip(),
+                        "completa": h["ini"] >= desde - 0.05 and h["fin"] <= hasta + 0.05})
+    return out
+
+
+def tiene_habla(c, minimo=0.4):
+    """True si alguien habla durante al menos `minimo` (fracción) del clip: ahí no va voz en off inventada."""
+    seg = float(c.get("segundos") or 0)
+    hablado = sum(h["fin"] - h["ini"] for h in c.get("habla", []))
+    return seg > 0 and hablado / seg >= minimo
+
+
+def subtitulos(habla, por=4):
+    """Parte cada frase en trozos de hasta `por` palabras repartiendo su tiempo según las letras.
+    Devuelve [(inicio, duracion, texto)] relativos al clip. Solo frases completas: un trozo de frase
+    cortada a la mitad no se subtitula (se leería mal)."""
+    out = []
+    for h in habla:
+        if not h.get("completa", True):
+            continue
+        pal = h["texto"].split()
+        trozos = [" ".join(pal[i:i + por]) for i in range(0, len(pal), por)]
+        total = sum(len(t) for t in trozos) or 1
+        t, dur = h["ini"], h["fin"] - h["ini"]
+        for tr in trozos:
+            d = dur * len(tr) / total
+            out.append((round(t, 2), round(max(0.4, d), 2), tr))
+            t += d
+    return out
+
+
 def es_escena(c):
     """¿Es un clip de escena animada (y no un tramo de video/foto)?"""
     return isinstance(c, dict) and bool(c.get("escena"))
@@ -622,7 +659,8 @@ def validar(sel, datos, permitidos=None, catalogo=None, escenas_ok=True):
         mapa[i_orig] = len(clips)
         clips.append({"archivo": d["archivo"], "foto": d["foto"], "desde": round(desde, 2),
                       "segundos": round(hasta - desde, 2), "paso": str(c.get("paso", "")), "motivo": c.get("motivo", ""),
-                      "audio": bool(c.get("audio"))})
+                      "audio": bool(c.get("audio")),
+                      "habla": [] if d["foto"] else habla_del_clip(d, desde, hasta - desde)})
     sel["clips"] = clips
     narr = []
     for n in sel.get("narracion", []):
@@ -1097,7 +1135,11 @@ def hacer_serie(carpeta, cfg, log):
             pr = precio_de(prod, cfg.get("catalogo", [])) if prod else None
             sel["narracion"] = [{"clip": i, "en": 0.3, "texto": plantilla[c["paso"]].format(
                 p=nombre_corto(prod) or "este modelo", pr=f"{pr:g} dólares" if isinstance(pr, (int, float)) else "buen precio")}
-                for i, c in enumerate(sel.get("clips", [])) if c.get("paso") in plantilla and not es_escena(c)]
+                for i, c in enumerate(sel.get("clips", []))
+                if c.get("paso") in plantilla and not es_escena(c) and not tiene_habla(c)]
+        for c in sel.get("clips", []):  # donde alguien habla se oye su voz y se subtitula lo que dice de verdad
+            if not es_escena(c) and tiene_habla(c):
+                c["audio"] = True
         revisar(sel, datos, set(plan["archivos"]), cfg, log, titulo)
         with lock:
             hechos[0] += 1
@@ -1363,6 +1405,7 @@ def armar_sel(carpeta, sel, nombre, cfg, log):
     script.add_track(cc.TrackType.video).add_track(cc.TrackType.video, "textos", relative_index=1)
     script.add_track(cc.TrackType.video, "cta", relative_index=2)
     script.add_track(cc.TrackType.text, "voz")
+    script.add_track(cc.TrackType.text, "subtitulos")
 
     def overlay(png, start, dur, pista="textos"):
         seg = cc.VideoSegment(png, trange_seconds(start, duration=dur))
@@ -1412,7 +1455,9 @@ def armar_sel(carpeta, sel, nombre, cfg, log):
         if p in fmt["pasos"] and p not in paso_visto and i > 0:
             paso_visto.add(p)  # una escena que abre el paso lo consume: no hay chip, ni tarde en otro clip
             if not es_escena(c):
-                png_paso(p, fmt["pasos"][p], png := os.path.join(out, f"paso{p}.png"), fmt["kicker"])
+                num = p if sel.get("formato") == "asi_compras" else str(len(paso_visto))
+                titulo = re.sub(r"^Dato \d+$", f"Dato {num}", fmt["pasos"][p])
+                png_paso(num, titulo, png := os.path.join(out, f"paso{p}.png"), fmt["kicker"])
                 overlay(png, inicio[i], min(3.5, c["segundos"]))
             cues.append(inicio[i])
     # CTA: nunca encima de una escena (taparía su texto). Si el reel cierra con la escena «cta», ella ya es el cierre;
@@ -1448,6 +1493,20 @@ def armar_sel(carpeta, sel, nombre, cfg, log):
                                           clip_settings=cc.ClipSettings(
                                               transform_y=Y_VOZ_ESCENA if sobre_escena else Y_VOZ)), "voz")
         fin_ocupado = start + dur + 0.1
+
+    # Subtítulos de la voz real: en los clips que suenan (sin voz en off encima) se escribe lo que la persona dice,
+    # en trozos cortos y grandes. Se omiten donde ya hay narración para no poner dos textos a la vez.
+    estilo_sub = cc.TextStyle(size=10, bold=True, color=(1, 1, 1), align=1, auto_wrapping=True)
+    for i, c in enumerate(sel["clips"]):
+        if es_escena(c) or c.get("foto") or (voz and i in narrados):
+            continue
+        for a, dur, texto in subtitulos(c.get("habla", [])):
+            if a >= c["segundos"]:
+                continue
+            script.add_segment(cc.TextSegment(texto, trange_seconds(inicio[i] + a, duration=min(dur, c["segundos"] - a)),
+                                              style=estilo_sub,
+                                              background=cc.TextBackground(color="#090807", alpha=0.55, round_radius=0.3),
+                                              clip_settings=cc.ClipSettings(transform_y=Y_VOZ)), "subtitulos")
 
     if cfg["musica"]:
         try:

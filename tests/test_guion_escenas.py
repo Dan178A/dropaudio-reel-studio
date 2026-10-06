@@ -134,6 +134,7 @@ def test_validar_clip_de_video_igual_que_antes():
     datos = material_corto()
     sel = {"clips": [{"archivo": "a.mp4", "desde": 1, "hasta": 7, "paso": "1", "audio": True, "motivo": "m"}]}
     c = rs.validar(sel, datos)["clips"][0]
+    assert isinstance(c.pop("habla"), list)  # la voz real del clip (para subtítulos)
     assert c == {"archivo": "a.mp4", "foto": False, "desde": 1.0, "segundos": 6.0, "paso": "1", "motivo": "m",
                  "audio": True}
 
