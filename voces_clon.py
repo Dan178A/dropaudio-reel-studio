@@ -13,9 +13,13 @@ de los audios derivados de el**. Las muestras de esta tarea son para decidir si
 sirven; **publicar reels que usen la voz clonada es una decision de Daniel**, y
 si esa salida llega a un uso comercial hay que cambiar de backend (ver abajo).
 
-Notas de instalacion (venv del repo, Windows):
+Notas de instalacion (venv del repo, Windows; pasos probados, en ese orden):
     venv\\Scripts\\python.exe -m pip install torch torchaudio --index-url https://download.pytorch.org/whl/cu124
     venv\\Scripts\\python.exe -m pip install coqui-tts
+    venv\\Scripts\\python.exe -m pip install "transformers==4.57.0"   # el pip resolver de coqui-tts 0.27.5 puede poner transformers 5.x y la API de XTTS exige 4.x (isin_mps_friendly)
+Si pip corrompe la descarga del wheel de torch (2.53 GB; paso 1 falla con
+"hash mismatch" al ~80%), descargar directo con curl reanudable desde
+download.pytorch.org/whl/cu124/ y verificar el sha256 antes de pip install.
 La primera vez que se genera audio con clonacion, XTTS-v2 se descarga
 (~1.9 GB) a la cache de Coqui (``%LOCALAPPDATA%\\tts`` o ``$TTS_HOME``) y despues
 todo corre offline. GPU objetivo: RTX 3060 Ti (8 GB, CUDA 12.4); sin GPU cae a
