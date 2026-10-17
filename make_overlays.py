@@ -152,8 +152,7 @@ sheet = Image.new('RGB', (W*3//2, H), (60, 70, 80))
 for i, n in enumerate(['01_gancho', '02_entregas', '03_castor', '04_y12', '05_prueba', '06_cta']):
     bg = Image.new('RGBA', (W, H), (70, 85, 95, 255))
     bg = Image.alpha_composite(bg, Image.open(O+n+'.png'))
-    sheet.paste(bg.convert('RGB').resize((W//4, H//4)),
-                ((i % 6)*W//4 if False else (i % 3)*W//2, (i//3)*H//2))
+    sheet.paste(bg.convert('RGB').resize((W//4, H//4)), ((i % 3)*W//2, (i//3)*H//2))
 sheet.resize((W*3//4, H//2)).save('/tmp/kit/sheet.jpg')
 
 # ---- v3: fondos de producto a pantalla completa (se animan en CapCut con zoom + fundido) ----
