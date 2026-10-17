@@ -43,7 +43,6 @@ BACKEND = "xtts"
 
 # Cache del modelo cargado (instancia pesada; se reusa entre llamadas)
 _modelo = None
-_razon_indisponible = None
 
 
 def _registros(mensaje):
@@ -54,15 +53,11 @@ def _registros(mensaje):
 
 
 def disponible():
-    """(disponible, razon) sin romper nada: revisa torch/TTS lazy y el dispositivo."""
-    global _razon_indisponible
-    if _razon_indisponible is not None:
-        return False, _razon_indisponible
+    """(disponible, razon) sin romper nada: revisa torch/TTS por lazy cada vez."""
     try:
         import torch  # noqa: PLC0415  (lazy a proposito)
     except Exception as e:  # ImportError de torch u otro paquete pesado
-        _razon_indisponible = "sin paquete TTS/torch instalado (: {})".format(e)
-        return False, _razon_indisponible
+        return False, "sin paquete TTS/torch instalado (: {})".format(e)
     try:
         torch.cuda.is_available()
     except Exception:
@@ -72,7 +67,7 @@ def disponible():
 
 def _modelo_cargado():
     """Instancia de TTS con XTTS-v2 (GPU si hay, CPU si no). Se cachea."""
-    global _modelo, _razon_indisponible
+    global _modelo
     if _modelo is not None:
         return _modelo
     os.environ.setdefault("COQUI_TOS_AGREED", "1")  # acepta CPML sin prompt interactivo
@@ -81,14 +76,14 @@ def _modelo_cargado():
 
         from TTS.api import TTS  # noqa: PLC0415  (lazy: el resto del pipeline no la necesita)
     except Exception as e:
-        _razon_indisponible = "no se pudo importar TTS (: {})".format(e)
+        _registros("no se pudo importar TTS (: {})".format(e))
         return None
     try:
         gpu = bool(torch.cuda.is_available())
         _modelo = TTS("tts_models/multilingual/multi-dataset/xtts_v2", gpu=gpu)
         _registros("XTTS-v2 cargado en {}".format(_dispositivo()))
     except Exception as e:
-        _razon_indisponible = "no se pudo cargar XTTS-v2 (: {})".format(e)
+        _registros("no se pudo cargar XTTS-v2 (: {})".format(e))
         return None
     return _modelo
 

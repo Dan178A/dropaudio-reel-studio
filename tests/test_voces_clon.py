@@ -90,9 +90,14 @@ def test_formato_entrega_48k_estereo_16bit_loudnorm(tmp_path):
     assert pico > 0.05
 
 
+@pytest.mark.lento
 def test_generacion_corta_con_backend(tmp_path):
     """Test LENTO (pytest -m lento): necesita coqui-tts + la descarga del modelo XTTS-v2."""
-    pytest.importorskip("TTS")
+    try:
+        import TTS  # noqa: F401  (TTS re-lanza ImportError con mensaje claro si falta torch)
+        import torch  # noqa: F401
+    except Exception:
+        pytest.skip("backend XTTS no instalado o torch ausente")
     ref = os.path.join(RAIZ, "voces", "ref_daniel", "ref_a_daniel.wav")
     if not os.path.isfile(ref):
         pytest.skip("sin referencia de voz")
