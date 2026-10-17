@@ -185,12 +185,14 @@ def _encajar(sig, total):
 
 
 def _leer_wav(ruta):
-    """Lee un WAV y lo devuelve mono float en [-1, 1]; convierte el formato con
-    ffmpeg si no es PCM de 8/16 bits."""
+    """Lee un WAV y lo devuelve mono float a SR (44.1 kHz) en [-1, 1]; convierte con
+    ffmpeg si no es PCM de 8/16 bits o si no esta a SR (p. ej. voz extraida a 48 kHz)."""
     try:
         with wave.open(ruta, "rb") as w:
-            ch, sw = w.getnchannels(), w.getsampwidth()
+            ch, sw, fr = w.getnchannels(), w.getsampwidth(), w.getframerate()
             datos = w.readframes(w.getnframes())
+        if fr != SR:
+            return _leer_wav_convertido(ruta)  # otra tasa de muestreo: remuestrea via ffmpeg
         if sw == 2:
             arr = np.frombuffer(datos, dtype="<i2").astype(float) / 32768.0
         elif sw == 1:
@@ -270,27 +272,27 @@ def mezclar(voz, cama_senal, total, salida=None, nivel_cama_db=NIVEL_CAMA_DB):
             cama_a = cama_a * (10 ** (nivel_cama_db / 20.0)) * (rms_voz / rms_cama)
     mezcla = voz_a + cama_a * _ganancia_duck(voz_a)
     pico = float(np.max(np.abs(mezcla))) if len(mezcla) else 0.0
-    if pico == 0.0:  # silencio puro: no hay nada que corregir
-        return mezcla
-    if pico > 0.97:  # resguardo de picos antes del loudnorm
-        mezcla = mezcla * (0.97 / pico)
-
-    with tempfile.TemporaryDirectory() as tmp:
-        entrada = os.path.join(tmp, "mezcla.wav")
-        normalizado = os.path.join(tmp, "normalizado.wav")
-        # stereo: el objetivo I=-14 se mide sobre el archivo que se entrega
-        guardar(mezcla, entrada, estereo=True)
-        medidas = _analizar_loudnorm(entrada)
-        filtro = ("loudnorm=I=-14:TP=-1.2:LRA=9"
-                  f":measured_I={medidas['integrado']:.2f}"
-                  f":measured_TP={medidas['tp_entrada']:.2f}"
-                  f":measured_LRA={medidas['lra_entrada']:.2f}"
-                  f":measured_thresh={medidas['umbral_entrada']:.2f}"
-                  f":offset={medidas['desplazamiento']:.2f}"
-                  ":linear=true:print_format=none")
-        _correr_ffmpeg(["-i", entrada, "-af", filtro,
-                        "-ar", str(SR), "-c:a", "pcm_s16le", normalizado])
-        final = _leer_wav(normalizado)
+    if pico == 0.0:  # silencio puro: el loudnorm no tiene nada que corregir
+        final = mezcla
+    else:
+        if pico > 0.97:  # resguardo de picos antes del loudnorm
+            mezcla = mezcla * (0.97 / pico)
+        with tempfile.TemporaryDirectory() as tmp:
+            entrada = os.path.join(tmp, "mezcla.wav")
+            normalizado = os.path.join(tmp, "normalizado.wav")
+            # stereo: el objetivo I=-14 se mide sobre el archivo que se entrega
+            guardar(mezcla, entrada, estereo=True)
+            medidas = _analizar_loudnorm(entrada)
+            filtro = ("loudnorm=I=-14:TP=-1.2:LRA=9"
+                      f":measured_I={medidas['integrado']:.2f}"
+                      f":measured_TP={medidas['tp_entrada']:.2f}"
+                      f":measured_LRA={medidas['lra_entrada']:.2f}"
+                      f":measured_thresh={medidas['umbral_entrada']:.2f}"
+                      f":offset={medidas['desplazamiento']:.2f}"
+                      ":linear=true:print_format=none")
+            _correr_ffmpeg(["-i", entrada, "-af", filtro,
+                            "-ar", str(SR), "-c:a", "pcm_s16le", normalizado])
+            final = _leer_wav(normalizado)
     if salida is not None:
         guardar(final, str(salida))
     return final

@@ -142,6 +142,35 @@ def test_mezclar_solo_silencio(tmp_path):
     assert np.all(mez == 0.0)
 
 
+def test_mezclar_solo_silencio_con_salida(tmp_path):
+    # incluso en silencio puro, salida= debe escribir el WAV (cero frames faltantes)
+    ruta = str(tmp_path / "silencio.wav")
+    mez = ea.mezclar(np.zeros(int(1.5 * ea.SR)), np.zeros(int(1.5 * ea.SR)), 1.5, salida=ruta)
+    guardado = ea._leer_wav(ruta)
+    assert guardado.shape == mez.shape == (int(1.5 * ea.SR),)
+    assert np.all(guardado == 0.0)
+
+
+def test_leer_wav_a_48k_remuestrea(tmp_path):
+    # voz extraida a 48 kHz (como la de los mp4): debe remuestrearse, no leerse bit a bit
+    import wave
+    ruta = str(tmp_path / "voz48.wav")
+    fr = 48000
+    t48 = np.arange(int(2.0 * fr)) / fr
+    with wave.open(ruta, "wb") as w:
+        w.setnchannels(1)
+        w.setsampwidth(2)
+        w.setframerate(fr)
+        w.writeframes(np.round(0.5 * np.sin(2 * np.pi * 440 * t48) * 32767).astype(np.int16).tobytes())
+    datos = ea._leer_wav(ruta)
+    assert len(datos) == int(2.0 * ea.SR)  # duracion correcta (no corrida ~9 % al 44.1)
+    mues = np.abs(np.fft.rfft(datos * np.hanning(len(datos))))
+    freqs = np.fft.rfftfreq(len(datos), 1.0 / ea.SR)
+    assert abs(freqs[np.argmax(mues)] - 440.0) < 5.0  # y el tono sigue en su frecuencia
+    mez = ea.mezclar(ruta, np.zeros(int(2.0 * fr)), 2.0)  # y pasa limpia por mezclar
+    assert len(mez) == int(2.0 * ea.SR)
+
+
 def test_verificar_rechaza_master_bajo(tmp_path):
     voz = _voz_ejemplo(10.0, pico=0.06)  # muy por debajo de la ventana
     ruta = str(tmp_path / "bajo.wav")
