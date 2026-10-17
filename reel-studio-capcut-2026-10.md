@@ -111,3 +111,7 @@ Luego, doble clic en `Reel_Studio.bat`. Necesita Ollama abierto, ffmpeg en el PA
 2. Probar `Crear_exe.bat` (Whisper y pyCapCut son lo más delicado al empaquetar).
 3. Programar o publicar el reel13 con el caption (solo cuando Daniel lo pida).
 4. Ideas para la app: tarjetas o fondos de producto automáticos cuando se nombra un producto en la transcripción (como en reel_real_03) y elegir la voz o idioma del guion.
+
+## 17-10-2026 · Motor de audio y voz real centralizados
+- Regla de voz real, en un solo punto (`marcar_habla_sel` dentro de `validar()`): modelo, reglas, crítico y flujo clásico — cero voz de plantilla sobre habla real; subtítulos sin solapes y frases cortadas con «…».
+- Master de entrega SIEMPRE con `entrega_audio.py`: cama discreta 100 BPM sin wobble/risers, duck 60/400 ms piso -8 dB, UNA normalización I=-14 TP=-1.2 (loudnorm lineal), `verificar()` sobre el archivo final. La voz clonada (XTTS-v2, GPU) es opcional y fail-soft — licencia CPML: publicación bajo cuenta del usuario.
