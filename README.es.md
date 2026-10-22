@@ -90,7 +90,8 @@ Para generar un `.exe`: `Crear_exe.bat` → `dist\ReelStudio\ReelStudio.exe`.
 | `studio.html` | Interfaz (negro/dorado, Space Grotesk + Plus Jakarta Sans) |
 | `reel_studio.py` | Motor: analizar, guion, armar en CapCut, PNG de marca, HEIC→JPG |
 | `reel_capcut.py` | Versión de línea de comandos (`analizar` / `elegir` / `armar`) |
-| `gen_music.py` | Música sintetizada sin derechos (128 BPM) |
+| `gen_music.py` | Música sintetizada sin derechos (100 BPM, delega en `entrega_audio`) |
+| `entrega_audio.py` | Motor de audio de entrega: cama discreta, duck por envolvente, master I=-14 LUFS con QC (`cama` / `mezclar` / `verificar`) |
 | `make_overlays.py`, `overlays/` | Textos y fondos de marca en PNG/JPG |
 | `readme-motion/` | Proyecto [HyperFrames](https://hyperframes.heygen.com) del video de este README |
 | `reel-studio-capcut-2026-10.md` | Decisiones, evolución del flujo, lecciones y pendientes |

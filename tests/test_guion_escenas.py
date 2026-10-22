@@ -134,6 +134,7 @@ def test_validar_clip_de_video_igual_que_antes():
     datos = material_corto()
     sel = {"clips": [{"archivo": "a.mp4", "desde": 1, "hasta": 7, "paso": "1", "audio": True, "motivo": "m"}]}
     c = rs.validar(sel, datos)["clips"][0]
+    assert isinstance(c.pop("habla"), list)  # la voz real del clip (para subtítulos)
     assert c == {"archivo": "a.mp4", "foto": False, "desde": 1.0, "segundos": 6.0, "paso": "1", "motivo": "m",
                  "audio": True}
 
@@ -357,6 +358,69 @@ def test_chequeos_banda_de_duracion_sale_del_objetivo():
 
 def test_critico_sabe_que_el_objetivo_es_una_meta():
     assert "meta, no una obligación" in rs.CRITICO_ESCENAS.format(objetivo=60)
+
+
+# ---------------------------------------------------------------- vía del modelo y del crítico: voz real vs. voz inventada
+def test_hacer_serie_via_modelo_filtro_de_narracion_sobre_habla(tmp_path, monkeypatch, con_escenas):
+    """El guion del modelo puede venir con voz en off encima de un clip donde la persona habla de verdad:
+    esa voz de plantilla se quita (en validar(), por el que pasan todas las vías) y el audio
+    original suena. Lo que el modelo escribió para clips sin voz real se respeta."""
+    import json
+    datos = datos_de(
+        archivo("b.mp4", 14, "unboxing", "KZ Castor Pro (Harman)"),
+        dict(archivo("a.mp4", 6, "unboxing", "KZ Castor Pro (Harman)"),
+             habla=[{"ini": 0.0, "fin": 6.0, "texto": "esto viene sellado de fábrica, como debe ser"}]))
+    (tmp_path / "analisis.json").write_text(json.dumps(datos), encoding="utf-8")
+
+    def falso(material, modelo, log=None, sistema=None, esquema=None, **kw):
+        return {"gancho": "g", "promesa": "p", "clips": [
+            {"archivo": "b.mp4", "desde": 0, "hasta": 5, "paso": "1"},
+            {"archivo": "a.mp4", "desde": 0, "hasta": 6, "paso": "2"}],
+                "narracion": [{"clip": 1, "en": 0.3, "texto": "Viene sellado de fábrica, como debe ser."},
+                              {"clip": 0, "en": 0.3, "texto": "Esto es lo que trae la caja."}]}
+
+    monkeypatch.setattr(rs, "escribir_guion", falso)
+    cfg = {"minimo": 0.5, "formatos": ["unboxing"], "max_por_formato": 1, "escritor": "modelo:falso",
+           "catalogo": CATALOGO, "voz_en_off": True, "critico": False, "duracion_objetivo": 35}
+    v = rs.hacer_serie(str(tmp_path), cfg, lambda *a: None)["videos"][0]
+    narr = {int(n["clip"]): n["texto"] for n in v["narracion"]}
+    assert narr == {0: "Esto es lo que trae la caja."}  # la del clip con voz real se fue
+    assert v["clips"][0]["audio"] is False and v["clips"][1]["audio"] is True
+
+
+def test_el_critico_corrigiendo_no_retrae_narracion_sobre_habla(tmp_path, monkeypatch, sin_escenas):
+    """R2 del review: la copia que vuelve a montar el crítico pasaba validar() sin el marcado audio/exclusión.
+    Ahora esa corrección centralizada lo cubre: el guion corregido sale limpio."""
+    import json
+    datos = datos_de(dict(archivo("a.mp4", 40, "unboxing", "KZ Castor Pro (Harman)"),
+                          habla=[{"ini": 0.0, "fin": 40.0, "texto": "monólogo real"}]))
+    (tmp_path / "analisis.json").write_text(json.dumps(datos), encoding="utf-8")
+    base = {"formato": "unboxing", "gancho": "g", "promesa": "p", "objetivo": 35, "clips": [
+        {"archivo": "a.mp4", "desde": 0.0, "segundos": 40.0, "paso": "gancho", "motivo": "", "audio": True}],
+        "narracion": []}
+    critica = {"puntaje": 6.0, "veredicto": "mejorar", "problemas": ["nada medible"],
+               "guion": {"gancho": "g2", "promesa": "p2", "clips": [
+                   {"archivo": "a.mp4", "desde": 0, "hasta": 40, "paso": "gancho"}],
+                   "narracion": [{"clip": 0, "en": 0.3, "texto": "¿Original o réplica? Te lo abro"}]}}
+    llamadas = []
+
+    def falso(material, modelo, log=None, sistema=None, esquema=None, **kw):
+        llamadas.append(esquema)
+        return critica
+
+    monkeypatch.setattr(rs, "escribir_guion", falso)
+    sel = rs.validar(dict(base), datos, {"a.mp4"})
+    rs.revisar(sel, datos, {"a.mp4"}, {"escritor": "modelo:falso", "critico": True, "voz_en_off": True,
+                                       "catalogo": CATALOGO, "escenas": False}, lambda *a: None, "titulo")
+    assert sel["narracion"] == [] and sel["revision"]["corregido"]  # la corrección trajo voz sobre habla; se limpia
+    assert sel["clips"][0]["audio"] is True
+    assert llamadas and llamadas[0] is rs.ESQUEMA_CRITICA_VIDEO
+
+
+def test_completar_voz_integrado_en_web_no_revienta(tmp_path, monkeypatch):
+    # /api/completar_voz llamaba a core.completar_voz, que no existía: AttributeError en producción
+    import studio_web
+    assert callable(studio_web.core.completar_voz)
 
 
 # ---------------------------------------------------------------- nombres cortos repetidos

@@ -100,7 +100,7 @@ FORMATOS = {
                    ("5", ["persona", "prueba_sonido"]), ("cta", ["producto_detalle", "persona"])]},
     "educativo": {
         "titulo": "Educativo", "kicker": "DATO", "por_producto": True, "reusa": True,
-        "gancho_ej": "3 cosas que nadie te dice de estos KZ", "gancho_prod": "3 cosas del {p} antes de comprarlo",
+        "gancho_ej": "Lo que nadie te dice de estos KZ", "gancho_prod": "Lo que debes saber del {p} antes de comprarlo",
         "promesa": "Míralo antes de comprar ↓",
         "pasos": {"1": "Dato 1", "2": "Dato 2", "3": "Dato 3", "4": "Para quién es", "5": "Precio"},
         "estructura": "gancho (pregunta o mito) -> 1 primer dato útil -> 2 segundo dato -> 3 tercer dato -> "
@@ -142,8 +142,8 @@ NARR_REGLAS = {
     "review": {"gancho": "¿Vale la pena? Te lo pruebo.", "1": "Este es el {p}.", "2": "Lo conectamos y vamos a escucharlo.",
                "3": "Escucha cómo suena.", "4": "Mira los detalles de construcción.", "5": "Por {pr}, para mí sí vale la pena.",
                "cta": "Comenta asesoría y te ayudamos a elegir."},
-    "educativo": {"gancho": "Antes de comprarlo, mira esto.", "1": "Primero: así se ve de cerca el {p}.",
-                  "2": "Segundo: esto es lo que trae la caja.", "3": "Tercero: así suena puesto.",
+    "educativo": {"gancho": "Antes de comprarlo, mira esto.", "1": "{ord}: así se ve de cerca el {p}.",
+                  "2": "{ord}: esto es lo que trae la caja.", "3": "{ord}: así suena puesto.",
                   "4": "Es para ti si quieres mejor sonido sin gastar de más.", "5": "Cuesta {pr} y tiene siete días de garantía.",
                   "cta": "Comenta asesoría y te ayudamos a elegir."},
     "entregas": {"gancho": "Así llegan tus KZ.", "1": "Tu pedido sale listo y sellado.", "2": "Vamos en moto hasta tu mano.",
@@ -158,6 +158,78 @@ NARR_REGLAS = {
 def nombre_corto(p):
     """«KZ AE01 (Adaptador BT)» -> «KZ AE01» para ganchos y textos en pantalla."""
     return re.sub(r"\s*\([^)]*\)", "", p or "").strip() or p
+
+
+def ordinal_es(n):
+    """«Primero», «Segundo»… para la voz en off, derivada del número de pasos vistos: así la voz dice siempre
+    lo mismo que el chip «Dato N» en pantalla (el chip de armar_sel numera igual)."""
+    if 1 <= n <= 7:
+        return ("Primero", "Segundo", "Tercero", "Cuarto", "Quinto", "Sexto", "Séptimo")[n - 1]
+    return f"Dato {n}"
+
+
+def _orden_pasos(sel, formato):
+    """{paso: número} con el número que verá el chip «Dato N»: cada paso del formato, la primera vez que
+    aparece, en el orden del reel (las escenas también consumen paso, como en armar_sel)."""
+    pasos_fmt = FORMATOS.get(formato, FORMATOS["asi_compras"])["pasos"]
+    orden, n = {}, 0
+    for c in sel.get("clips", []):
+        p = str(c.get("paso", ""))
+        if p in pasos_fmt and p not in orden:
+            n += 1
+            orden[p] = n
+    return orden
+
+
+def _texto_narracion(plantilla, paso, orden, producto, pr):
+    """Una frase de NARR_REGLAS con el nombre corto del producto y el precio («13 dólares»/«buen precio»);
+    los ordinales («{ord}») salen de la posición del paso entre los vistos."""
+    texto = plantilla[paso]
+    val = {"p": nombre_corto(producto) or "este modelo",
+           "pr": f"{pr:g} dólares" if isinstance(pr, (int, float)) else "buen precio"}
+    if "{ord}" in texto:
+        val["ord"] = ordinal_es(orden.get(paso, 1))
+    return texto.format(**val)
+
+
+def narracion_de_plantilla(sel, formato, producto=None, catalogo=None):
+    """La voz en off de respaldo para un guion sin modelo (o con el modelo fallido): una frase por cada clip
+    con paso en la plantilla. Donde habla alguien de verdad no va nada, y los ordinales («Primero:»,
+    «Segundo:») salen de la posición del paso entre los vistos, para que nunca contradigan al chip «Dato N»."""
+    plantilla = NARR_REGLAS.get(formato, {})
+    if not plantilla:
+        return []
+    pr = precio_de(producto, catalogo) if producto else None
+    orden = _orden_pasos(sel, formato)
+    return [{"clip": i, "en": 0.3, "texto": _texto_narracion(plantilla, str(c.get("paso", "")), orden, producto, pr)}
+            for i, c in enumerate(sel.get("clips", []))
+            if str(c.get("paso", "")) in plantilla and not es_escena(c) and not tiene_habla(c)]
+
+
+def completar_voz(sel, formato, producto, precio=None, info=None):
+    """Rellena SOLO los huecos de voz en off (clips sin habla real y sin voz ya escrita): lo que ya hay no lo
+    toca y donde habla alguien no mete voz de plantilla. La llaman el botón «Completar la voz en off» de la
+    interfaz web y el crítico. `info` (los datos de la tienda) queda disponible para enriquecer la frase.
+    Devuelve el número de frases añadidas."""
+    plantilla = NARR_REGLAS.get(formato, {})
+    if not plantilla:
+        return 0
+    narr = list(sel.get("narracion") or [])
+    cubiertos = set()
+    for n in narr:
+        try:
+            cubiertos.add(int(n["clip"]))
+        except (KeyError, TypeError, ValueError):
+            continue
+    orden = _orden_pasos(sel, formato)
+    nuevas = []
+    for i, c in enumerate(sel.get("clips", [])):
+        p = str(c.get("paso", ""))
+        if es_escena(c) or i in cubiertos or tiene_habla(c) or p not in plantilla:
+            continue
+        nuevas.append({"clip": i, "en": 0.3, "texto": _texto_narracion(plantilla, p, orden, producto, precio)})
+    sel["narracion"] = narr + nuevas
+    return len(nuevas)
 
 
 # ---------------------------------------------------------------- Ollama
@@ -573,6 +645,89 @@ def sin_cortar_frases(d, desde, hasta, maximo=12.0):
     return max(0.0, a), min(d["dur"] - 0.05, b)
 
 
+def habla_del_clip(d, desde, segundos):
+    """Frases de Whisper que caen dentro del clip, con tiempos relativos al clip (recortadas a sus bordes)."""
+    hasta, out = desde + segundos, []
+    for h in (d or {}).get("habla", []):
+        a, b = max(h["ini"], desde), min(h["fin"], hasta)
+        if b - a > 0.2 and h.get("texto", "").strip():
+            out.append({"ini": round(a - desde, 2), "fin": round(b - desde, 2), "texto": h["texto"].strip(),
+                        "completa": h["ini"] >= desde - 0.05 and h["fin"] <= hasta + 0.05})
+    return out
+
+
+def tiene_habla(c, minimo=0.4):
+    """True si hay voz de verdad en el clip: bastante hablado (cociente `minimo`), o una frase entera en uno
+    largo (la regla del cociente seco dejaba a quien hablaba poco sin sonido y sin subtítulos).
+    Ahí no va voz en off inventada y sí subtitula lo que la persona dice."""
+    seg = float(c.get("segundos") or 0)
+    frases = [h for h in c.get("habla", []) if h.get("texto", "").strip()]
+    hablado = sum(h["fin"] - h["ini"] for h in frases)
+    return seg > 0 and (hablado / seg >= minimo or hablado >= 1.5)
+
+
+def subtitulos(habla, por=4, minimo=0.4):
+    """Parte cada frase en trozos de hasta `por` palabras repartiendo su tiempo según las letras.
+    Devuelve [(inicio, duracion, texto)] relativos al clip, en orden y SIN solaparse: cada caja muestra
+    lo que se avanza (y si un trozo es muy corto, se estira él solo hasta `minimo`). Las frases cortadas
+    por el borde del clip también se subtitulan; llevan «…» para leerse como parte de algo más grande."""
+    out, fin = [], 0.0
+    for h in sorted(habla or [], key=lambda x: (x["ini"], x["fin"])):
+        texto = h["texto"].strip()
+        if not texto:
+            continue
+        pal = texto.split()
+        trozos = [" ".join(pal[i:i + por]) for i in range(0, len(pal), por)]
+        if not h.get("completa", True):
+            trozos[0] = "… " + trozos[0]
+        total = sum(map(len, trozos)) or 1
+        t = max(h["ini"], fin)
+        dispo = h["fin"] - t
+        if dispo <= 0:  # se pisa con el trozo anterior: sin hueco, el anterior lo cubre
+            continue
+        for tr in trozos:
+            d = max(minimo, dispo * len(tr) / total)
+            out.append((round(t, 2), round(d, 2), tr))
+            t += d
+        fin = t
+    return out
+
+
+def marcar_habla_sel(sel, datos=None):
+    """EL punto por el que pasan TODAS las vías (modelo, reglas, crítico, flujo clásico y los guiones editados
+    a mano) para la voz real: donde alguien habla de verdad suena su voz (audio=True) y NO se le pone encima
+    la voz en off de plantilla — la narración de ese clip se quita. Lo llama validar() siempre; armar_sel lo
+    re-verifica al armar porque seleccion.json/serie.json pueden venir editados a mano. Con `datos` vuelve a
+    medir el habla de cada clip con sus cortes actuales (un corte a mano cambia sus bordes)."""
+    clips = sel.get("clips", [])
+    for c in clips:
+        if es_escena(c):
+            continue
+        d = None if (c.get("foto") or datos is None) else datos.get(c.get("archivo"))
+        if d:
+            a = float(c.get("desde", 0) or 0)
+            b = a + float(c.get("segundos") or 0)
+            if b <= a:
+                b = float(c.get("hasta", d.get("dur", 0)) or 0)
+            if b - a > 0:
+                c["habla"] = habla_del_clip(d, a, b - a)
+        c["audio"] = bool(c.get("audio")) or tiene_habla(c)
+    narr = []
+    for n in sel.get("narracion") or []:
+        try:
+            i = int(n.get("clip", -1))
+        except (TypeError, ValueError):
+            continue
+        c = clips[i] if 0 <= i < len(clips) else None
+        if c is None:
+            continue  # a un clip que ya no existe no se puede colgar la voz
+        if not es_escena(c) and tiene_habla(c):
+            continue  # voz real en el clip: la narración de plantilla fuera
+        narr.append(dict(n, clip=i))
+    sel["narracion"] = narr
+    return sel
+
+
 def es_escena(c):
     """¿Es un clip de escena animada (y no un tramo de video/foto)?"""
     return isinstance(c, dict) and bool(c.get("escena"))
@@ -622,7 +777,8 @@ def validar(sel, datos, permitidos=None, catalogo=None, escenas_ok=True):
         mapa[i_orig] = len(clips)
         clips.append({"archivo": d["archivo"], "foto": d["foto"], "desde": round(desde, 2),
                       "segundos": round(hasta - desde, 2), "paso": str(c.get("paso", "")), "motivo": c.get("motivo", ""),
-                      "audio": bool(c.get("audio"))})
+                      "audio": bool(c.get("audio")),
+                      "habla": [] if d["foto"] else habla_del_clip(d, desde, hasta - desde)})
     sel["clips"] = clips
     narr = []
     for n in sel.get("narracion", []):
@@ -637,7 +793,7 @@ def validar(sel, datos, permitidos=None, catalogo=None, escenas_ok=True):
     if not sel.get("gancho"):
         sel["gancho"] = f["gancho_ej"]
     sel.setdefault("promesa", f["promesa"])
-    return sel
+    return marcar_habla_sel(sel)  # la regla de la voz real (audio y sin voz en off encima) en UN punto, todas las vías
 
 
 def prompt_formato(formato, voz=True):
@@ -1093,11 +1249,7 @@ def hacer_serie(carpeta, cfg, log):
             sel.update(validar(dict(reglas(), formato=plan["formato"]), datos, set(plan["archivos"]),
                                catalogo=catalogo, escenas_ok=sel["escenas"]))
         if cfg.get("voz_en_off", True) and not sel.get("narracion"):  # reglas (o el modelo falló): voz en off básica
-            plantilla = NARR_REGLAS.get(plan["formato"], {})
-            pr = precio_de(prod, cfg.get("catalogo", [])) if prod else None
-            sel["narracion"] = [{"clip": i, "en": 0.3, "texto": plantilla[c["paso"]].format(
-                p=nombre_corto(prod) or "este modelo", pr=f"{pr:g} dólares" if isinstance(pr, (int, float)) else "buen precio")}
-                for i, c in enumerate(sel.get("clips", [])) if c.get("paso") in plantilla and not es_escena(c)]
+            sel["narracion"] = narracion_de_plantilla(sel, plan["formato"], prod, catalogo)
         revisar(sel, datos, set(plan["archivos"]), cfg, log, titulo)
         with lock:
             hechos[0] += 1
@@ -1271,8 +1423,15 @@ def encuadre(path):
 
 
 def armar(carpeta, nombre, cfg, log):
-    """Modo clásico: un borrador desde seleccion.json."""
+    """Modo clásico: un borrador desde seleccion.json (que puede venir editado a mano: se revalida con el
+    análisis, para que la regla de la voz real y los cortes que respetan frases vuelvan a aplicar)."""
     sel = json.load(open(os.path.join(carpeta, "seleccion.json"), encoding="utf-8"))
+    try:
+        datos = json.load(open(os.path.join(carpeta, "analisis.json"), encoding="utf-8"))
+    except (OSError, ValueError):
+        datos = {}
+    if datos:
+        sel = validar(sel, datos)
     return armar_sel(carpeta, sel, nombre, cfg, log)
 
 
@@ -1297,6 +1456,36 @@ def sin_clips(sel, quitar):
     mapa = {i: k for k, i in enumerate(quedan)}
     return dict(sel, clips=[sel["clips"][i] for i in quedan],
                 narracion=[dict(n, clip=mapa[int(n["clip"])]) for n in sel.get("narracion", []) if int(n["clip"]) in mapa])
+
+
+def fusionar_fragmentos(sel):
+    """Los fragmentos de menos de 0.25 s (un corte a mano que quedó en nada: un trange de 0.05–0.1 s tumba
+    pycapcut con ValueError y con todo el armado). Se fusionan con el clip ANTERIOR si es el mismo tramo
+    contiguo de video; si no se pueden fusionar (tras una escena, otro archivo), se saltan y la narración
+    sigue a su clip. Devuelve (sel, fusionados, saltados); no muerde el guion original."""
+    clips, saltar, fusionados = list(sel.get("clips", [])), set(), 0
+    for i in range(len(clips) - 1, -1, -1):
+        c = clips[i]
+        if i in saltar or float(c.get("segundos", 0) or 0) >= 0.25:
+            continue
+        if i == 0:  # sin anterior: no hay con qué fusionarlo
+            saltar.add(0)
+            continue
+        a = clips[i - 1]
+        contiguo = (a.get("archivo") == c.get("archivo") and not a.get("foto") and not c.get("foto")
+                    and not es_escena(a) and not es_escena(c)
+                    and abs(float(a.get("desde", 0)) + float(a.get("segundos", 0)) - float(c.get("desde", 0))) < 0.05)
+        if not contiguo or i - 1 in saltar:
+            saltar.add(i)
+            continue
+        a = dict(a, segundos=round(float(a.get("segundos", 0)) + float(c.get("segundos", 0) or 0), 3))
+        clips[i - 1] = a
+        saltar.add(i)  # el fragmento quedó fundido dentro del anterior: sobra como clip
+        fusionados += 1
+    sel = dict(sel, clips=clips)
+    if saltar:
+        sel = sin_clips(sel, saltar)  # la lista completa: sin_clips reubica la narración con los índices de antes
+    return sel, fusionados, len(saltar) - fusionados
 
 
 def renderizar_escenas(carpeta, sel, nombre, log):
@@ -1341,6 +1530,15 @@ def armar_sel(carpeta, sel, nombre, cfg, log):
     import pycapcut as cc
     from pycapcut import trange_seconds, tim
 
+    sel, fusionados, saltados = fusionar_fragmentos(sel)
+    if fusionados or saltados:
+        log("error", f"«{nombre}»: {fusionados} fragmento(s) de menos de 0.25 s se fusionaron con el clip "
+                     f"anterior y {saltados} se saltaron (tumbaban el armado).")
+    try:  # re-verificación defensiva: seleccion.json/serie.json pueden venir editados a mano
+        datos = json.load(open(os.path.join(carpeta, "analisis.json"), encoding="utf-8"))
+    except (OSError, ValueError):
+        datos = {}
+    sel = marcar_habla_sel(sel, datos)
     sel = renderizar_escenas(carpeta, sel, nombre, log)
     # Cada escena se prueba con pycapcut antes de crear el borrador: si su tramo no cabe en el .mp4 (ValueError) u
     # otro fallo del archivo, se omite como una escena fallida (narración reubicada) en vez de tumbar todo el reel.
@@ -1363,6 +1561,7 @@ def armar_sel(carpeta, sel, nombre, cfg, log):
     script.add_track(cc.TrackType.video).add_track(cc.TrackType.video, "textos", relative_index=1)
     script.add_track(cc.TrackType.video, "cta", relative_index=2)
     script.add_track(cc.TrackType.text, "voz")
+    script.add_track(cc.TrackType.text, "subtitulos")
 
     def overlay(png, start, dur, pista="textos"):
         seg = cc.VideoSegment(png, trange_seconds(start, duration=dur))
@@ -1412,7 +1611,9 @@ def armar_sel(carpeta, sel, nombre, cfg, log):
         if p in fmt["pasos"] and p not in paso_visto and i > 0:
             paso_visto.add(p)  # una escena que abre el paso lo consume: no hay chip, ni tarde en otro clip
             if not es_escena(c):
-                png_paso(p, fmt["pasos"][p], png := os.path.join(out, f"paso{p}.png"), fmt["kicker"])
+                num = p if sel.get("formato") == "asi_compras" else str(len(paso_visto))
+                titulo = re.sub(r"^Dato \d+$", f"Dato {num}", fmt["pasos"][p])
+                png_paso(num, titulo, png := os.path.join(out, f"paso{p}.png"), fmt["kicker"])
                 overlay(png, inicio[i], min(3.5, c["segundos"]))
             cues.append(inicio[i])
     # CTA: nunca encima de una escena (taparía su texto). Si el reel cierra con la escena «cta», ella ya es el cierre;
@@ -1432,22 +1633,44 @@ def armar_sel(carpeta, sel, nombre, cfg, log):
         overlay(cta, cta_ini, fin - cta_ini, "cta")
 
     # Narración como texto: en CapCut -> seleccionar los textos de la pista "voz" -> Texto a voz -> Nandez.
-    # Sobre video real va donde siempre; si toca una escena, baja a la franja libre de abajo (las plantillas dejan
-    # y ≈ 1540-1920 sin contenido) para no tapar los textos de la escena.
+    # Sobre video real va donde siempre; si toca una escena o coincide en tiempo con un subtítulo, baja a la
+    # franja libre de abajo (las plantillas dejan y ≈ 1540-1920 sin contenido). Nunca se sale de su clip:
+    # si se pasara, cortaría encima del texto de otro clip.
     estilo = cc.TextStyle(size=7, bold=True, color=(0.94, 0.93, 0.91), align=1, auto_wrapping=True)
     tramos_escena = [(inicio[i], inicio[i] + c["segundos"]) for i, c in enumerate(sel["clips"]) if es_escena(c)]
+
+    # Subtítulos de la voz real: en los clips que suenan (sin voz en off encima) se escribe lo que la persona
+    # dice, en trozos cortos y grandes. Se omiten donde ya hay narración para no poner dos textos a la vez.
+    estilo_sub = cc.TextStyle(size=10, bold=True, color=(1, 1, 1), align=1, auto_wrapping=True)
+    subt = []
+    for i, c in enumerate(sel["clips"]):
+        if es_escena(c) or c.get("foto") or (voz and i in narrados):
+            continue
+        for a, dur, texto in subtitulos(c.get("habla", [])):
+            if a >= c["segundos"]:
+                continue
+            subt.append((inicio[i] + a, min(dur, c["segundos"] - a), texto))
+
     fin_ocupado = 0.0
     for n in sel.get("narracion", []):
-        start = max(inicio[int(n["clip"])] + float(n.get("en", 0.3)), fin_ocupado)
+        base = inicio[int(n["clip"])]
+        fin_clip = base + sel["clips"][int(n["clip"])]["segundos"]
+        start = max(base + float(n.get("en", 0.3)), fin_ocupado)
         dur = max(1.5, len(n["texto"].split()) * 0.38)  # ~2,6 palabras por segundo
-        if start + dur > t:
+        dur = min(dur, fin_clip - start)
+        if dur <= 0 or start + dur > t:
             continue
-        sobre_escena = any(a < start + dur and start < b for a, b in tramos_escena)
+        sobre = any(a < start + dur and start < b for a, b in tramos_escena)
+        sobre = sobre or any(a < start + dur and start < a + b for a, b, _ in subt)  # subt: (inicio, duración)
         script.add_segment(cc.TextSegment(n["texto"], trange_seconds(start, duration=dur), style=estilo,
                                           background=cc.TextBackground(color="#090807", alpha=0.6, round_radius=0.3),
                                           clip_settings=cc.ClipSettings(
-                                              transform_y=Y_VOZ_ESCENA if sobre_escena else Y_VOZ)), "voz")
+                                              transform_y=Y_VOZ_ESCENA if sobre else Y_VOZ)), "voz")
         fin_ocupado = start + dur + 0.1
+    for s, d, texto in subt:
+        script.add_segment(cc.TextSegment(texto, trange_seconds(s, duration=d), style=estilo_sub,
+                                          background=cc.TextBackground(color="#090807", alpha=0.55, round_radius=0.3),
+                                          clip_settings=cc.ClipSettings(transform_y=Y_VOZ)), "subtitulos")
 
     if cfg["musica"]:
         try:

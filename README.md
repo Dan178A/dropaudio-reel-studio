@@ -93,7 +93,8 @@ To build a standalone executable: `Crear_exe.bat` → `dist\ReelStudio\ReelStudi
 | `studio.html` | Interface (black/gold, Space Grotesk + Plus Jakarta Sans) |
 | `reel_studio.py` | Engine: analyze, script, assemble in CapCut, brand PNGs, HEIC→JPG |
 | `reel_capcut.py` | Command-line version (`analizar` / `elegir` / `armar`) |
-| `gen_music.py` | Royalty-free synthesized soundtrack (128 BPM) |
+| `gen_music.py` | Royalty-free synthesized soundtrack (100 BPM, delegates to `entrega_audio`) |
+| `entrega_audio.py` | Delivery audio engine: discrete music bed, envelope ducking, I=-14 LUFS master + QC (`cama` / `mezclar` / `verificar`) |
 | `make_overlays.py`, `overlays/` | Brand text and backgrounds as PNG/JPG |
 | `readme-motion/` | HyperFrames project behind the video at the top of this README |
 | `reel-studio-capcut-2026-10.md` | Decisions, how the pipeline evolved, lessons and open items |

@@ -216,3 +216,86 @@ def test_narracion_sobre_escena_baja_a_la_franja_libre(entorno):
     ys = {textos[sg["material_id"]]: sg["clip"]["transform"]["y"] for sg in voz["segments"]}
     assert ys == {"Hola uno": rs.Y_VOZ, "Aquí el precio": rs.Y_VOZ_ESCENA}
     assert 1540 < 960 - rs.Y_VOZ_ESCENA * 960 < 1720  # centro del texto en la franja libre, dentro de la zona segura
+
+
+# ---------------------------------------------------------------- R3: narración vs subtítulos (misma y, cajas en solape)
+def _texto_pista(d, nombre):
+    tr = next(tr for tr in d["tracks"] if tr["type"] == "text" and tr.get("name") == nombre)
+    textos = {m["id"]: json.loads(m["content"])["text"] for m in d["materials"]["texts"]}
+    return [(textos[sg["material_id"]], sg["target_timerange"]["start"], sg["target_timerange"]["duration"],
+             sg["clip"]["transform"]["y"]) for sg in tr["segments"]]
+
+
+def test_narracion_no_se_sale_de_su_clip(entorno):
+    """La caja de la narración no entra al clip siguiente (ahí puede haber subtítulos en la misma y)."""
+    carpeta, drafts, cfg, *_ = entorno
+    sel = _sel("precio")
+    sel["clips"][0]["paso"] = "1"
+    sel["narracion"] = [{"clip": 0, "en": 3.0, "texto":
+                         "una frase larguisima de muchas palabras que de sobra pasa del final del clip"}]
+    rs.armar_sel(str(carpeta), sel, "t_cap", cfg, lambda k, x: None)
+    voz = _texto_pista(_contenido(drafts, "t_cap"), "voz")
+    assert voz and voz[0][1] + voz[0][2] <= 4_000_000  # el clip 0 dura 4 s: no se sale
+
+
+def test_narracion_y_subtitulo_coincidentes_van_a_distintas_y(entorno):
+    """Con la voz en off apagada (no TTS) los subtítulos no se omiten: si la narración coincide en tiempo
+    con uno, baja a la franja libre para no taparlo."""
+    carpeta, drafts, cfg, *_ = entorno
+    cfg["voz_en_off"] = False
+    sel = _sel("precio")
+    sel["clips"][0]["habla"] = [{"ini": 0.2, "fin": 0.6, "texto": "hola", "completa": True}]  # un tropiezo: no manda
+    sel["narracion"] = [{"clip": 0, "en": 0.0, "texto": "Nadie habla aqui"}]
+    rs.armar_sel(str(carpeta), sel, "t_ysolape", cfg, lambda k, x: None)
+    d = _contenido(drafts, "t_ysolape")
+    ys = {t: y for t, s, du, y in _texto_pista(d, "voz") + _texto_pista(d, "subtitulos")}
+    assert ys["hola"] == rs.Y_VOZ
+    assert ys["Nadie habla aqui"] == rs.Y_VOZ_ESCENA
+
+
+def test_subtitulos_hablan_lo_que_se_oye(entorno):
+    """Con voz en off (normal): un clip con habla real lleva su subtítulo y su audio; sin voz de plantilla."""
+    carpeta, drafts, cfg, *_ = entorno
+    sel = _sel("precio")
+    sel["clips"][0]["habla"] = [{"ini": 0.5, "fin": 3.5, "texto": "esto lo digo yo de verdad", "completa": True}]
+    rs.armar_sel(str(carpeta), sel, "t_subs", cfg, lambda k, x: None)
+    d = _contenido(drafts, "t_subs")
+    subs = _texto_pista(d, "subtitulos")
+    assert [t for t, *_ in subs]
+    voz = [t for t, *_ in _texto_pista(d, "voz")]
+    assert voz == ["Aquí el precio"]  # la narración sobre el clip con voz real se quita; la de la escena queda
+
+
+def test_fragmento_diminuto_no_tumbar_armar_sel(entorno):
+    """R6: un fragmento de 0.06 s fusionado con el clip anterior; nadie crea un trange minúsculo."""
+    carpeta, drafts, cfg, llamadas, pasos, escena_mp4 = entorno
+    sel = _sel("precio")
+    sel["clips"][0]["segundos"] = 2.0
+    sel["clips"][1:1] = [{"archivo": "real.mp4", "foto": False, "desde": 2.0, "segundos": 0.06,
+                          "paso": "2", "motivo": "", "audio": False}]
+    logs = []
+    t = rs.armar_sel(str(carpeta), sel, "t_frag", cfg, lambda k, x: logs.append((k, x)))
+    assert abs(t - 5.06) < 0.02  # 2.06 (fusionado) + 3.0 (escena)
+    assert any("se fusionaron" in x for k, x in logs)  # se avisa lo que se arregló solo
+    video = next(segs for nom, segs in _pistas(_contenido(drafts, "t_frag")) if nom == "video" or nom == "")
+    assert [os.path.basename(r) for r, _, _ in video] == ["real.mp4", os.path.basename(escena_mp4)]
+    assert video[0][2] == 0  # el primer segmento empieza en 0
+    assert video[0][1] == 0 and video[1][1] == 0  # narrado y escena: volumen cero
+
+
+def test_armar_revalida_el_seleccion_json(entorno, tmp_path):
+    """R8: flujo clásico; el seleccion.json editado a mano se revalida al armar: la narración que quedó
+    encima de voz real se quita y esa voz suena."""
+    carpeta, drafts, cfg, *_ = entorno
+    json.dump({"real.mp4": {"archivo": "real.mp4", "foto": False, "dur": 4.0, "tomas": [],
+                            "habla": [{"ini": 0.0, "fin": 4.0, "texto": "yo hablo de verdad"}]}},
+              open(os.path.join(str(carpeta), "analisis.json"), "w", encoding="utf-8"))
+    json.dump({"formato": "asi_compras", "gancho": "g", "clips": [
+        {"archivo": "real.mp4", "foto": False, "desde": 0.0, "segundos": 4.0, "paso": "gancho", "audio": False}],
+        "narracion": [{"clip": 0, "en": 0.5, "texto": "¿Pagas antes y rezas que llegue?"}]},
+              open(os.path.join(str(carpeta), "seleccion.json"), "w", encoding="utf-8"), ensure_ascii=False)
+    rs.armar(str(carpeta), "t_reval", cfg, lambda k, x: None)
+    d = _contenido(drafts, "t_reval")
+    assert not _texto_pista(d, "voz")  # la voz de plantilla sobre habla real, fuera
+    video = [sgs for nom, sgs in _pistas(d) if nom == "video" or nom == ""][0]
+    assert video[0][1] == 1.0  # y el audio original suena
